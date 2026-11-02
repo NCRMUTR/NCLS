@@ -1,0 +1,73 @@
+/* HBT Core — exam.css : ส่วนเสริมของหน้าสอบออนไลน์ (นักศึกษาทำข้อสอบ + อาจารย์จัดข้อสอบ) ใช้ตัวแปรสีเดียวกับ app.css */
+.ex-hero{background:var(--accent);color:var(--accent-fg);border-radius:14px;padding:18px}
+.ex-hero .code{font:500 .78rem var(--mono);letter-spacing:.12em;opacity:.85}
+.ex-hero h2{margin:4px 0 2px;font-size:1.3rem}
+.ex-hero .by{font-size:.86rem;opacity:.9}
+.ex-hero .tag{display:inline-flex;margin-top:10px;padding:2px 11px;border-radius:999px;font:600 .74rem var(--mono);background:rgba(255,255,255,.18)}
+
+.ex-head{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:9px 0 8px;margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px)));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ex-head .in{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.ex-clock{font:600 1.15rem var(--mono);font-variant-numeric:tabular-nums}
+.ex-clock.warn{color:var(--warn)}.ex-clock.hot{color:var(--bad)}
+.ex-prog{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:6px}
+.ex-prog i{display:block;height:100%;width:100%;background:var(--accent);transition:width 1s linear}
+.ex-prog i.warn{background:var(--warn)}.ex-prog i.hot{background:var(--bad)}
+
+.ex-q{font-size:1.1rem;font-weight:500;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}
+.ex-img{max-width:100%;border-radius:10px;border:1px solid var(--line);margin-top:12px;display:block}
+.ex-opt{display:flex;gap:12px;align-items:center;width:100%;text-align:left;padding:13px 14px;border:1.6px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer;font:inherit;color:var(--fg);margin-top:9px;min-height:52px}
+.ex-opt:hover{border-color:var(--accent)}
+.ex-opt .k{flex:none;width:30px;height:30px;border-radius:50%;border:1.6px solid var(--line);display:flex;align-items:center;justify-content:center;font:600 .8rem var(--mono);color:var(--muted)}
+.ex-opt .tx{flex:1;min-width:0;overflow-wrap:anywhere}
+.ex-opt img{max-width:100%;max-height:190px;border-radius:8px;display:block}
+.ex-opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.ex-opt.sel .k{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.ex-opt.right{border-color:var(--good);background:var(--good-soft)}
+.ex-opt.right .k{background:var(--good);border-color:var(--good);color:var(--surface)}
+.ex-opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.ex-opt.wrong .k{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+.ex-opt[disabled]{cursor:default}
+.ex-reveal{border-radius:12px;padding:14px;margin-top:14px;border:1px solid var(--line)}
+.ex-reveal.ok{background:var(--good-soft);border-color:transparent;color:var(--good)}
+.ex-reveal.no{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.ex-reveal p{white-space:pre-wrap;margin-top:4px;color:var(--fg)}
+.ex-reveal img{max-width:100%;border-radius:8px;margin-top:8px}
+.ex-warn{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 13px;font-size:.88rem}
+.ex-foot{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--bg);border-top:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.ex-foot .in{max-width:720px;margin:0 auto;display:flex;gap:10px;align-items:center}
+.ex-pad{height:84px}
+.ex-omr{display:flex;flex-wrap:wrap;gap:6px}
+.ex-omr .b{min-width:34px;height:34px;padding:0 4px;border-radius:8px;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font:600 .78rem var(--mono);color:var(--muted);background:var(--surface)}
+.ex-omr .b.done{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
+.ex-omr .b.cur{outline:2px solid var(--accent);outline-offset:1px}
+.ex-omr .b.nav{cursor:pointer}
+.ex-omr .b.ok{background:var(--good-soft);border-color:transparent;color:var(--good)}
+.ex-omr .b.no{background:var(--bad-soft);border-color:transparent;color:var(--bad)}
+.ex-score{font:600 2.6rem/1 var(--mono);letter-spacing:-.03em}
+.ex-spk{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit;font-size:.84rem;color:var(--fg)}
+.ex-spk.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.ex-list{margin:0;padding-left:1.2em}
+.ex-list li{margin:0 0 8px;line-height:1.6}
+.ex-att{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line);font-size:.9rem}
+.ex-att:last-child{border-bottom:0}
+
+/* อาจารย์ */
+.ex-qrow{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.ex-qrow .no{flex:none;min-width:34px;height:34px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font:600 .84rem var(--mono)}
+.ex-qrow .body{flex:1;min-width:0}
+.ex-qrow .txt{white-space:pre-wrap;overflow-wrap:anywhere}
+.ex-ch{display:flex;gap:6px;align-items:center;margin-top:4px;font-size:.88rem;overflow-wrap:anywhere}
+.ex-ch.right{color:var(--good);font-weight:600}
+.ex-thumb{max-height:64px;max-width:120px;border-radius:6px;border:1px solid var(--line);vertical-align:middle}
+.ex-edch{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:start;padding:8px;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+.ex-edch.right{border-color:var(--good);background:var(--good-soft)}
+.ex-edch input[type=radio]{margin-top:12px;width:20px;height:20px;accent-color:var(--good)}
+.ex-bar{height:10px;border-radius:5px;background:var(--surface2);overflow:hidden;min-width:60px}
+.ex-bar i{display:block;height:100%;background:var(--accent)}
+.ex-hist{display:flex;gap:4px;align-items:flex-end;height:80px}
+.ex-hist div{flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:2px;position:relative}
+.ex-hist span{position:absolute;top:-17px;left:0;right:0;text-align:center;font-size:.7rem;color:var(--muted)}
+.ex-histx{display:flex;gap:4px;font-size:.7rem;color:var(--muted)}
+.ex-histx span{flex:1;text-align:center}
+.ex-live-hot{color:var(--bad);font-weight:700}
+.scroll-x{overflow-x:auto}

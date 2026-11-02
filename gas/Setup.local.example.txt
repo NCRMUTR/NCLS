@@ -1,0 +1,11 @@
+// คัดลอกไฟล์นี้เป็น  Setup.local.gs  (ชื่อใหม่ ในโฟลเดอร์เดียวกัน) แล้วแก้ค่าด้านล่าง
+// Setup.local.gs อยู่ใน .gitignore → ไม่ขึ้น GitHub · แต่ `clasp push` จะดันขึ้น Apps Script ให้
+// ค่าที่เว้นว่างจะไม่ทับค่าเริ่มต้นใน Setup.gs
+var SETUP_LOCAL = {
+  GOOGLE_CLIENT_ID: '',     // จาก Google Cloud (Auth Platform → Clients) เช่น 1234567890-abc.apps.googleusercontent.com
+  FIRST_ADMIN_EMAIL: '',    // อีเมลผู้ดูแลระบบคนแรก เช่น somchai@rmutr.ac.th
+  FIRST_ADMIN_NAME: '',     // ชื่อที่แสดง
+  EXAM_URL: ''              // Web App URL ของ Exam API (ลงท้าย /exec) — ใส่หลัง deploy Exam แล้วรัน setupCore ซ้ำ
+  // DOMAIN: 'rmutr.ac.th', // ไม่ต้องใส่ ใช้ค่าเริ่มต้นใน Setup.gs
+  // SPREADSHEET_ID: ''     // เว้นว่าง = สร้างไฟล์ชีตใหม่ให้
+};

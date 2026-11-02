@@ -1,0 +1,16 @@
+# ===== ความลับ / ค่าเฉพาะเครื่อง — ห้ามขึ้น Git =====
+Setup.local.gs
+**/Setup.local.gs
+.clasp.json
+.clasprc.json
+.env
+.env.*
+
+# ===== ทั่วไป =====
+node_modules/
+__pycache__/
+*.zip
+.vercel/
+shots*/
+.DS_Store
+Thumbs.db

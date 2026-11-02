@@ -1,0 +1,10 @@
+// คัดลอกไฟล์นี้เป็น  Setup.local.gs  (ชื่อใหม่ ในโฟลเดอร์เดียวกัน) แล้วแก้ค่าด้านล่าง
+// Setup.local.gs อยู่ใน .gitignore → ไม่ขึ้น GitHub · แต่ `clasp push` จะดันขึ้น Apps Script ให้
+//
+// ⚠ SEC_TOKEN คือกุญแจหลักของระบบ: ห้ามแปะในแชท/คอมมิต · ใส่เฉพาะตอนรัน setupExam
+//   รันเสร็จให้เปลี่ยนเป็น '' แล้ว `clasp push` ทับอีกครั้ง (ค่าถูกเก็บใน Script Properties แล้ว)
+var SETUP_LOCAL = {
+  CORE_URL: '',     // Web App URL ของ Core (ลงท้าย /exec)
+  SEC_TOKEN: ''     // คัดลอกจาก Core: รัน setupShowSecret แล้วดู Execution log
+  // SPREADSHEET_ID: ''  // เว้นว่าง = สร้างไฟล์ชีตใหม่ให้
+};
