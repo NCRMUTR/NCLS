@@ -49,10 +49,12 @@
     box.innerHTML =
       '<div class="field"><label for="lq">ค้นหารหัสหรือชื่อของคุณ</label><input id="lq" type="search" autocomplete="off" placeholder="พิมพ์รหัสหรือชื่อ"></div>' +
       '<div class="field"><label for="lsel">ชื่อของคุณ</label><select id="lsel"><option value="">กำลังโหลด…</option></select></div>' +
-      '<div class="field"><label for="lpin">PIN 4 หลัก</label><input class="pin-in" id="lpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></div>' +
+      '<div class="field"><label for="lpin" id="lpinLbl">PIN 4 หลัก</label><input class="pin-in" id="lpin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></div>' +
+      '<div class="field" id="lpin2Box" hidden><label for="lpin2">ยืนยัน PIN ใหม่อีกครั้ง</label><input class="pin-in" id="lpin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></div>' +
+      '<div class="callout warn small" id="lfirst" hidden><b>เข้าครั้งแรกของภาคเรียนนี้</b> — ยังไม่มี PIN ของคุณ ตั้งได้เลย: ใส่ PIN 4 หลักที่ต้องการในช่องบน แล้วยืนยันอีกครั้งในช่องนี้ จำไว้ใช้ตลอดภาคเรียน (ถ้าไม่ใช่คุณที่ไม่เคยตั้ง แต่ระบบให้ตั้ง PIN ใหม่ แจ้งอาจารย์)</div>' +
       '<div class="err" id="lerr" role="alert"></div>' +
       '<button class="btn primary block" type="button" id="lgo" style="min-height:50px;font-size:1.05rem">เข้าสู่ระบบ</button>' +
-      '<p class="small muted">ยังไม่เคยตั้ง PIN หรือลืม PIN? <a href="' + HBT.api.root() + 's/pin.html">ตั้ง / เปลี่ยน PIN</a></p>';
+      '<p class="small muted">ลืม PIN? <a href="' + HBT.api.root() + 's/pin.html">เปลี่ยน PIN / ขอรหัสชั่วคราว</a></p>';
 
     function fill() {
       var q = $('#lq', box).value.trim().toLowerCase();
@@ -63,21 +65,37 @@
       if (cur && list.some(function (s) { return s.stdId === cur; })) $('#lsel', box).value = cur;
       else if (list.length === 1 && q) $('#lsel', box).value = list[0].stdId;
     }
+    var firstMode = false;      // true = ยังไม่มี PIN ของภาคเรียนนี้ → ตั้งเองตอนเข้าครั้งแรก (ต้องใส่ยืนยัน)
+    function setFirstMode(on) {
+      firstMode = on; $('#lpin2Box', box).hidden = !on; $('#lfirst', box).hidden = !on;
+      $('#lpinLbl', box).textContent = on ? 'PIN ใหม่ (ตัวเลข 4 หลัก)' : 'PIN 4 หลัก';
+      $('#lgo', box).textContent = on ? 'ตั้ง PIN และเข้าสู่ระบบ' : 'เข้าสู่ระบบ';
+      if (!on) $('#lpin2', box).value = '';
+    }
     function submit() {
-      var std = $('#lsel', box).value, pin = $('#lpin', box).value, err = $('#lerr', box), b = $('#lgo', box);
+      var std = $('#lsel', box).value, pin = $('#lpin', box).value, pin2 = $('#lpin2', box).value, err = $('#lerr', box), b = $('#lgo', box);
       err.textContent = '';
       if (!std) { err.textContent = 'กรุณาเลือกชื่อของคุณ'; return; }
       if (!/^\d{4}$/.test(pin)) { err.textContent = 'PIN ต้องเป็นตัวเลข 4 หลัก'; return; }
+      if (firstMode && pin !== pin2) { err.textContent = 'PIN ใหม่ทั้งสองช่องไม่ตรงกัน'; return; }
       if (busy) return; busy = true;
+      var label = b.textContent;
       HBT.busy(b, function () {
         b.textContent = 'กำลังตรวจสอบ…';
-        return login(opts.courseId, std, pin, opts.tid).then(function (s) { $('#lpin', box).value = ''; opts.onDone(s); });
+        var pre = firstMode ? HBT.api.call('pin.setFirst', { courseId: opts.courseId, stdId: std, newPin: pin }, { token: '' }) : Promise.resolve();
+        return pre.then(function () { return login(opts.courseId, std, pin, opts.tid); }).then(function (s) { $('#lpin', box).value = ''; $('#lpin2', box).value = ''; opts.onDone(s); });
       }).catch(function (e) {
-        $('#lpin', box).value = '';
-        if (e.code === 'E_PIN_NONE') err.innerHTML = 'คุณยังไม่ได้ตั้ง PIN — ขอ “รหัสชั่วคราว” จากอาจารย์ แล้ว<a href="' + HBT.api.root() + 's/pin.html">ตั้ง PIN ที่หน้านี้</a>ก่อน';
+        b.textContent = label;
+        if (e.code === 'E_PIN_NONE') { setFirstMode(true); $('#lpin2', box).value = ''; $('#lpin2', box).focus(); return; }   // เก็บ PIN ที่พิมพ์ไว้ ให้แค่ยืนยัน
+        $('#lpin', box).value = ''; $('#lpin2', box).value = '';
+        if (e.code === 'E_PIN_EXISTS') { setFirstMode(false); err.textContent = HBT.errMsg(e); }
+        else if (e.code === 'E_PIN_NEEDTEMP') { setFirstMode(false); err.innerHTML = 'อาจารย์ออกรหัสชั่วคราวให้คุณแล้ว — <a href="' + HBT.api.root() + 's/pin.html">ตั้ง PIN ใหม่ด้วยรหัสชั่วคราวที่หน้านี้</a>ก่อน'; }
         else err.textContent = HBT.errMsg(e);
       }).then(function () { busy = false; });
     }
+    $('#lsel', box).addEventListener('change', function () { setFirstMode(false); });
+    $('#lpin2', box).addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); });
+    $('#lpin2', box).addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     $('#lq', box).addEventListener('input', fill);
     $('#lgo', box).addEventListener('click', submit);
     $('#lpin', box).addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); });

@@ -174,7 +174,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
       };
       if (s.pinStatus === 'none') { HBT.busy(b, doIssue).catch(function (er) { HBT.toast(HBT.errMsg(er), 'bad'); }); return; }
       confirmBox('รีเซ็ต PIN ของ ' + s.name + '?',
-        '<p>PIN เดิมจะใช้ไม่ได้ทันที และ PIN นี้ใช้ร่วมกับทุกวิชา/ทุกระบบของนักศึกษาคนนี้ ระบบจะออกรหัสชั่วคราวใหม่ให้ไปตั้ง PIN เอง</p>',
+        '<p>PIN เดิมจะใช้ไม่ได้ทันที และ PIN นี้ใช้ร่วมกับทุกวิชา/ทุกระบบของนักศึกษาคนนี้ในภาคเรียนนี้ ระบบจะออกรหัสชั่วคราวใหม่ให้ไปตั้ง PIN เอง</p>',
         'รีเซ็ต PIN', true, function () { return doIssue(); });
       return;
     }

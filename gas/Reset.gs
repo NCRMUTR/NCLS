@@ -210,8 +210,10 @@ var Reset = (function () {
 
   /* ---------- PIN ที่ไม่มีนักศึกษาในวิชาใดแล้ว ---------- */
   function pins(user, a) {
-    var alive = {};
-    Db.all('Students').forEach(function (r) { alive[r.std_id] = true; });
+    // PIN แยกตามภาคเรียน: คีย์ = "termId|stdId" · ไม่มีนักศึกษาคนนั้นในวิชาใดของภาคนั้น (หรือเป็นคีย์รุ่นเก่าที่ไม่ถูกใช้แล้ว) = ค้าง
+    var alive = {}, termOf = {};
+    Db.all('Courses').forEach(function (c) { termOf[c.course_id] = c.term_id || '-'; });
+    Db.all('Students').forEach(function (r) { alive[(termOf[r.course_id] || '-') + '|' + r.std_id] = true; });
     var orphan = Db.all('StudentPIN').filter(function (r) { return !alive[r.std_id]; }).map(function (r) { return r.std_id; });
     if (U.bool(a.dryRun)) return { orphans: orphan.length, dryRun: true };
     var set = {}; orphan.forEach(function (s) { set[s] = true; });

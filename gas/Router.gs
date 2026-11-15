@@ -202,6 +202,10 @@ var ROUTES = {
     auth: 'none', lock: true,
     fn: function (a) { return Pin.setWithTemp(a); }
   },
+  'pin.setFirst': {
+    auth: 'none', lock: true,
+    fn: function (a) { return Pin.setFirst(a); }
+  },
   'pin.change': {
     auth: 'none', lock: true,
     fn: function (a) { return Pin.change(a); }

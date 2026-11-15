@@ -61,7 +61,7 @@ var Students = (function () {
     var c = Courses.require(user, courseId);
     var roster = rosterOf_(c.course_id);
     var ids = roster.map(function (s) { return s.std_id; });
-    var st = Pin.statuses(ids), req = Pin.openRequestIds(c.course_id);
+    var st = Pin.statuses(c.course_id, ids), req = Pin.openRequestIds(c.course_id);
     var counts = { total: roster.length, set: 0, temp: 0, none: 0, requests: 0 };
     var students = roster.map(function (s) {
       var p = st[s.std_id];

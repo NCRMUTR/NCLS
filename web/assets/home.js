@@ -16,7 +16,7 @@ HBT.page({ active: 'home' }, function (ctx) {
   }
 
   h += '<a class="card link-card" id="goCourses" href="' + root + 't/courses.html"><div class="row sp"><h3>รายวิชาของฉัน</h3><span class="pill acc">ข้อมูลกลาง</span></div>' +
-    '<p class="small muted">สร้างรายวิชา นำเข้ารายชื่อนักศึกษา ออกรหัสให้ตั้ง PIN จัดการคะแนน</p><span class="arrow">เปิด ›</span></a>';
+    '<p class="small muted">สร้างรายวิชา นำเข้ารายชื่อนักศึกษา รีเซ็ต PIN ให้นักศึกษา จัดการคะแนน</p><span class="arrow">เปิด ›</span></a>';
   h += '<div class="grid g3" id="sysCards">';
   ['att', 'exam', 'asg'].forEach(function (s) {
     var ok = mine.indexOf(s) >= 0;

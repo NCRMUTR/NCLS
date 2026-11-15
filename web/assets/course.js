@@ -46,7 +46,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
       '<div class="card"><span class="small muted">ตั้ง PIN แล้ว</span><h2 id="stPin">' + c.pinSet + ' / ' + c.students + '</h2></div>' +
       '<div class="card"><span class="small muted">ประเภทคะแนน</span><h2 id="stTypes">' + c.scoreTypes + '</h2></div></div>' +
       '<div class="grid g3">' +
-      '<a class="card link-card" id="goStudents" href="' + root + 't/students.html?id=' + q + '"><h3>รายชื่อนักศึกษา</h3><p class="small muted">เพิ่ม/นำเข้าจาก CSV · ออกรหัสชั่วคราวให้ตั้ง PIN · ลบนักศึกษา</p><span class="arrow">เปิด ›</span></a>' +
+      '<a class="card link-card" id="goStudents" href="' + root + 't/students.html?id=' + q + '"><h3>รายชื่อนักศึกษา</h3><p class="small muted">เพิ่ม/นำเข้าจาก CSV · ดูสถานะ PIN / รีเซ็ต PIN (ออกรหัสชั่วคราว) · ลบนักศึกษา</p><span class="arrow">เปิด ›</span></a>' +
       '<a class="card link-card" id="goScores" href="' + root + 't/scores.html?id=' + q + '"><h3>คะแนน</h3><p class="small muted">กำหนดประเภทคะแนนและน้ำหนัก · กรอก/วางจาก Excel · ส่งออก CSV</p><span class="arrow">เปิด ›</span></a>' +
       '<a class="card link-card" id="goBackup" href="' + root + 't/backup.html?id=' + q + '"><div class="row sp"><h3>สำรองข้อมูลวิชา</h3>' + backupPill(c) + '</div><p class="small muted">ดาวน์โหลดรายชื่อ คะแนน เช็คชื่อ ข้อสอบ และไฟล์งานของนักศึกษาเก็บไว้ก่อนสิ้นภาคเรียน</p><span class="arrow">เปิด ›</span></a>' +
       '</div>' +

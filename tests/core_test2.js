@@ -181,7 +181,7 @@ test('impact/remove: แสดงจำนวนที่จะหายก่�
   const s = world(); const id = mkCourse(s, s.T1); mkStudents(s, s.T1, id, 2);
   const ty = ok(s.api(s.T1, 'score.saveType', { courseId: id, name: 'ก', pct: 10, max: 10 })).typeId;
   ok(s.api(s.T1, 'score.saveBulk', { courseId: id, typeId: ty, rows: [{ stdId: '660001', score: 5 }, { stdId: '660002', score: 6 }] }));
-  s.ctx().Pin.setInitial('660001', '1234');
+  s.ctx().Pin.setInitial(s.ctx().Pin.key(id, '660001'), '1234');
   const im = ok(s.api(s.T1, 'student.impact', { courseId: id, stdId: '660001' }));
   assert.deepStrictEqual(im.items.filter(x => x.count > 0), [{ key: 'scores', label: 'คะแนน', count: 1 }]);
   assert.ok(im.items.some(x => x.key === 'attendance'));
@@ -222,14 +222,14 @@ test('issueTemp: ออกรหัส 4 หลักให้ที่เลื
 });
 test('issueTemp: ไม่ส่ง stdIds = ทั้งห้อง · ข้ามคนที่ตั้ง PIN แล้ว · อาจารย์อื่นถูกปฏิเสธ', () => {
   const s = pinWorld();
-  s.ctx().Pin.setInitial('660001', '4321');
+  s.ctx().Pin.setInitial(s.ctx().Pin.key(s.cid, '660001'), '4321');
   const r = issue(s, undefined);
   assert.strictEqual(r.codes.length, 2); assert.strictEqual(r.skipped, 1);
   assert.strictEqual(code(s.api(s.T2, 'pin.issueTemp', { courseId: s.cid, all: true })), 'E_FORBIDDEN');
 });
 test('issueTemp: ขอซ้ำ (คนที่ตั้งแล้ว) เมื่อระบุเอง = reset ได้', () => {
   const s = pinWorld();
-  s.ctx().Pin.setInitial('660001', '4321');
+  s.ctx().Pin.setInitial(s.ctx().Pin.key(s.cid, '660001'), '4321');
   const r = issue(s, ['660001']);
   assert.strictEqual(r.codes.length, 1);
   assert.strictEqual(ok(s.api(s.T1, 'student.list', { courseId: s.cid })).students[0].pinStatus, 'temp');
@@ -239,7 +239,7 @@ test('setWithTemp: รหัสถูก → ตั้ง PIN ใหม่ได
   ok(s.call({ action: 'pin.setWithTemp', args: { courseId: s.cid, stdId: '660001', tempPin: t, newPin: '2468' } }));
   assert.strictEqual(ok(s.api(s.T1, 'student.list', { courseId: s.cid })).students[0].pinStatus, 'set');
   assert.strictEqual(code(s.call({ action: 'pin.setWithTemp', args: { courseId: s.cid, stdId: '660001', tempPin: t, newPin: '1357' } })), 'E_PIN_TEMP');
-  assert.strictEqual(s.ctx().Pin.verify('660001', '2468') !== false, true);
+  assert.strictEqual(s.ctx().Pin.verify(s.ctx().Pin.key(s.cid, '660001'), '2468') !== false, true);
 });
 test('setWithTemp: รหัสผิด E_PIN_TEMP · นักศึกษานอกวิชาถูกปฏิเสธ · PIN ไม่ใช่ 4 หลัก E_PIN_FORMAT', () => {
   const s = pinWorld(); const t = issue(s, ['660001']).codes[0].pin;
@@ -285,7 +285,7 @@ test('ล็อกหมดเวลา (cache หมดอายุ) → ลอ
   ok(s.call({ action: 'pin.setWithTemp', args: { courseId: s.cid, stdId: '660001', tempPin: t, newPin: '2468' } }));
 });
 test('change: PIN เดิมถูก → เปลี่ยนได้ · เดิมผิด E_PIN_BAD · ใหม่=เดิม E_PIN_SAME', () => {
-  const s = pinWorld(); s.ctx().Pin.setInitial('660001', '1111');
+  const s = pinWorld(); s.ctx().Pin.setInitial(s.ctx().Pin.key(s.cid, '660001'), '1111');
   const c = (o, n) => code(s.call({ action: 'pin.change', args: { courseId: s.cid, stdId: '660001', oldPin: o, newPin: n } }));
   assert.strictEqual(c('2222', '3333'), 'E_PIN_BAD');
   assert.strictEqual(c('1111', '1111'), 'E_PIN_SAME');
@@ -296,15 +296,48 @@ test('change: PIN เดิมถูก → เปลี่ยนได้ · �
 test('change: ยังไม่เคยตั้ง PIN → E_PIN_NONE · ผิดครบ → ล็อก', () => {
   const s = pinWorld();
   assert.strictEqual(code(s.call({ action: 'pin.change', args: { courseId: s.cid, stdId: '660001', oldPin: '1111', newPin: '2222' } })), 'E_PIN_NONE');
-  s.ctx().Pin.setInitial('660001', '1111');
+  s.ctx().Pin.setInitial(s.ctx().Pin.key(s.cid, '660001'), '1111');
   const max = Number(s.ctx().Settings.get('pin_max_fail'));
   let last; for (let i = 0; i < max; i++) last = code(s.call({ action: 'pin.change', args: { courseId: s.cid, stdId: '660001', oldPin: '0000', newPin: '2222' } }));
   assert.strictEqual(last, 'E_PIN_LOCKED');
 });
 test('setInitial: ตั้งซ้ำเมื่อมี PIN แล้วไม่ได้', () => {
   const s = pinWorld(); const P = s.ctx().Pin;
-  P.setInitial('660001', '1111');
-  assert.throws(() => P.setInitial('660001', '2222'));
+  P.setInitial(P.key(s.cid, '660001'), '1111');
+  assert.throws(() => P.setInitial(P.key(s.cid, '660001'), '2222'));
+});
+test('setFirst: นักศึกษาตั้ง PIN เองตอนเข้าครั้งแรกโดยไม่ต้องมีรหัสชั่วคราว → ล็อกอินได้ · ตั้งซ้ำ E_PIN_EXISTS · นอกวิชา E_NOT_FOUND · PIN ผิดรูปแบบ E_PIN_FORMAT', () => {
+  const s = pinWorld(); const L = pin => code(s.call({ action: 'stu.login', args: { courseId: s.cid, stdId: '660001', pin } }));
+  const F = (id, pin) => code(s.call({ action: 'pin.setFirst', args: { courseId: s.cid, stdId: id, newPin: pin } }));
+  assert.strictEqual(L('1234'), 'E_PIN_NONE');
+  assert.strictEqual(F('999999', '1234'), 'E_NOT_FOUND'); assert.strictEqual(F('660001', '12'), 'E_PIN_FORMAT');
+  assert.strictEqual(F('660001', '1234'), 'OK');
+  assert.strictEqual(L('1234'), 'OK'); assert.strictEqual(L('4321'), 'E_PIN_BAD');
+  assert.strictEqual(F('660001', '9999'), 'E_PIN_EXISTS'); assert.strictEqual(L('1234'), 'OK');           // ตั้งทับไม่ได้
+  assert.ok(JSON.stringify(s.rows('StudentPIN')).indexOf('"1234"') < 0, 'ห้ามเก็บ PIN จริง');
+  assert.strictEqual(ok(s.api(s.T1, 'student.list', { courseId: s.cid })).students[0].pinStatus, 'set');
+});
+test('setFirst: อาจารย์ออกรหัสชั่วคราว (รีเซ็ต) ไว้แล้ว → ต้องใช้รหัสนั้น E_PIN_NEEDTEMP (ตั้งทับด้วยรหัสนักศึกษาอย่างเดียวไม่ได้) · ล็อกอินแจ้ง E_PIN_NEEDTEMP', () => {
+  const s = pinWorld(); ok(s.call({ action: 'pin.setFirst', args: { courseId: s.cid, stdId: '660001', newPin: '1111' } }));
+  const t = issue(s, ['660001']).codes[0].pin;
+  assert.strictEqual(code(s.call({ action: 'pin.setFirst', args: { courseId: s.cid, stdId: '660001', newPin: '2222' } })), 'E_PIN_NEEDTEMP');
+  assert.strictEqual(code(s.call({ action: 'stu.login', args: { courseId: s.cid, stdId: '660001', pin: '1111' } })), 'E_PIN_NEEDTEMP');
+  ok(s.call({ action: 'pin.setWithTemp', args: { courseId: s.cid, stdId: '660001', tempPin: t, newPin: '2468' } }));
+  assert.strictEqual(code(s.call({ action: 'stu.login', args: { courseId: s.cid, stdId: '660001', pin: '2468' } })), 'OK');
+});
+test('PIN แยกตามภาคเรียน: ภาคใหม่ต้องตั้งใหม่ (PIN ภาคเก่าใช้ไม่ได้) · วิชาอื่นในภาคเดียวกันใช้ PIN เดิม', () => {
+  const s = pinWorld(); const b = mkCourse(s, s.T1, 'B2'); mkStudents(s, s.T1, b, 1);
+  ok(s.call({ action: 'pin.setFirst', args: { courseId: s.cid, stdId: '660001', newPin: '1111' } }));
+  assert.strictEqual(code(s.call({ action: 'stu.login', args: { courseId: b, stdId: '660001', pin: '1111' } })), 'OK');   // ภาคเดียวกัน
+  const t2 = ok(s.api(s.A, 'term.create', { name: '2/2569' })).terms.find(t => t.name === '2/2569');
+  ok(s.api(s.A, 'term.setCurrent', { termId: t2.termId }));
+  const c2 = mkCourse(s, s.T1, 'C3'); mkStudents(s, s.T1, c2, 1);
+  assert.strictEqual(ok(s.api(s.T1, 'student.list', { courseId: c2 })).students[0].pinStatus, 'none');
+  assert.strictEqual(code(s.call({ action: 'stu.login', args: { courseId: c2, stdId: '660001', pin: '1111' } })), 'E_PIN_NONE');
+  assert.strictEqual(code(s.call({ action: 'pin.setFirst', args: { courseId: c2, stdId: '660001', newPin: '3333' } })), 'OK');
+  assert.strictEqual(code(s.call({ action: 'stu.login', args: { courseId: c2, stdId: '660001', pin: '3333' } })), 'OK');
+  assert.strictEqual(s.rows('StudentPIN').length, 2);                                   // ภาคเก่าไม่ถูกทับ
+  assert.strictEqual(code(s.call({ action: 'pin.change', args: { courseId: c2, stdId: '660001', oldPin: '1111', newPin: '4444' } })), 'E_PIN_BAD');
 });
 test('request: ลืม PIN → คำขอค้างโผล่ในรายการของอาจารย์ · ซ้ำไม่เพิ่มแถว · ตั้งใหม่สำเร็จแล้วปิดคำขอ', () => {
   const s = pinWorld();
@@ -324,13 +357,13 @@ test('request: นักศึกษานอกวิชา/รหัสเพ�
   assert.strictEqual(code(s.call({ action: 'pin.request', args: { courseId: s.cid, stdId: '<b>' } })), 'E_NOT_FOUND');
   assert.strictEqual(code(s.call({ action: 'pin.request', args: { courseId: 'nope', stdId: '660001' } })), 'E_NOT_FOUND');
 });
-test('PIN คนเดียวใช้ข้ามวิชา: ตั้งในวิชา A ใช้ยืนยันได้ในอีกวิชา', () => {
+test('PIN คนเดียวใช้ข้ามวิชาในภาคเรียนเดียวกัน: ตั้งในวิชา A ใช้ยืนยันได้ในอีกวิชา', () => {
   const s = pinWorld(); const b = mkCourse(s, s.T1, 'B2'); mkStudents(s, s.T1, b, 1);
-  s.ctx().Pin.setInitial('660001', '1111');
+  s.ctx().Pin.setInitial(s.ctx().Pin.key(s.cid, '660001'), '1111');
   assert.strictEqual(ok(s.api(s.T1, 'student.list', { courseId: b })).students[0].pinStatus, 'set');
 });
 test('ตั้งค่า pin_max_fail จากหน้า admin มีผลทันที', () => {
-  const s = pinWorld(); s.ctx().Pin.setInitial('660001', '1111');
+  const s = pinWorld(); s.ctx().Pin.setInitial(s.ctx().Pin.key(s.cid, '660001'), '1111');
   ok(s.api(s.A, 'settings.set', { changes: { pin_max_fail: 3 } }));
   let last; for (let i = 0; i < 3; i++) last = code(s.call({ action: 'pin.change', args: { courseId: s.cid, stdId: '660001', oldPin: '0000', newPin: '2222' } }));
   assert.strictEqual(last, 'E_PIN_LOCKED');

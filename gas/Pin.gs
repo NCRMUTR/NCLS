@@ -1,14 +1,14 @@
 /**************************************************************
  * File: Pin.gs  (HBT Core v0.3.0)
- * PIN นักศึกษา 4 หลัก — 1 คน 1 PIN ใช้ข้ามวิชา/ข้ามระบบ (อาจารย์ไม่มี PIN: ตัวตนคือบัญชี Google)
+ * PIN นักศึกษา 4 หลัก — 1 คน 1 PIN ต่อ "ภาคเรียน" ใช้ข้ามวิชา/ข้ามระบบในภาคเรียนนั้น (อาจารย์ไม่มี PIN: ตัวตนคือบัญชี Google)
+ *  - นักศึกษาตั้ง PIN เองตอนเข้าระบบครั้งแรกของภาคเรียน (setFirst / ตอนเช็คชื่อ setInitial) — ไม่ต้องมีรหัสจากอาจารย์
+ *  - ภาคเรียนใหม่ = ตั้ง PIN ใหม่ (PIN ภาคเก่าไม่ถูกใช้) · คีย์ของแถว PIN/อุปกรณ์ = "termId|stdId" (ดู key())
  *
  *  - เก็บเฉพาะแฮช: SHA-256(salt | stdId | pin | pepper)  pepper = SEC_PIN (Script Properties, สร้างอัตโนมัติ)
  *    ⚠ ห้ามเปลี่ยน/ลบ SEC_PIN: ทุก PIN จะใช้ไม่ได้ ต้องออกรหัสชั่วคราวใหม่ทั้งหมด
- *  - ตั้ง PIN ครั้งแรก/ลืม PIN = ใช้ "รหัสชั่วคราว" 4 หลักที่อาจารย์ออกให้ (ใช้ได้ครั้งเดียว อายุ 7 วัน)
- *    กันคนอื่นแย่งตั้ง PIN แทนด้วยรหัสนักศึกษาอย่างเดียว
+ *  - ลืม PIN = ใช้ "รหัสชั่วคราว" 4 หลักที่อาจารย์ออกให้ (ใช้ได้ครั้งเดียว อายุ 7 วัน) — อาจารย์รีเซ็ตให้รายคนได้
  *  - กันเดา: ผิดเกินกำหนด (ตั้งค่า pin_max_fail) → ล็อกต่อรหัสนักศึกษา pin_lock_min นาที (นับใน cache)
  *    รหัสชั่วคราวที่ใส่ผิดก็นับรวมกัน
- *  - ตั้ง PIN ตอนเช็คชื่อครั้งแรกในห้อง (setInitial) จะเพิ่มในขั้นเช็คชื่อ — ฟังก์ชันพร้อมแล้ว
  **************************************************************/
 
 var Pin = (function () {
@@ -33,6 +33,12 @@ var Pin = (function () {
     if (typeof pin === 'number') pin = String(pin);
     if (typeof pin !== 'string' || !/^\d{4}$/.test(pin)) throw U.E('E_PIN_FORMAT');
     return pin;
+  }
+
+  /** คีย์ PIN ของนักศึกษาในภาคเรียนของวิชานี้ = "termId|stdId" (PIN แยกตามภาคเรียน) */
+  function key(courseId, stdId) {
+    var c = Db.byId('Courses', String(courseId || ''));
+    return (c && c.term_id ? c.term_id : '-') + '|' + stdId;
   }
 
   /* ---------- ล็อกกันเดา (cache) ---------- */
@@ -72,46 +78,48 @@ var Pin = (function () {
     if (r.temp_hash && exp && exp.getTime() > Date.now()) return 'temp';
     return 'none';
   }
-  function status(stdId) { return rowStatus_(Db.byId('StudentPIN', String(stdId))); }
-  /** สถานะของหลายคนในครั้งเดียว (อ่านชีตรอบเดียว) → { stdId: 'none'|'temp'|'set' } */
-  function statuses(stdIds) {
-    var map = {};
+  /** k = key(courseId, stdId) */
+  function status(k) { return rowStatus_(Db.byId('StudentPIN', String(k))); }
+  /** สถานะของหลายคนในวิชานี้ (อ่านชีตรอบเดียว) → { stdId: 'none'|'temp'|'set' } */
+  function statuses(courseId, stdIds) {
+    var map = {}, pre = key(courseId, '');
     Db.all('StudentPIN').forEach(function (r) { map[r.std_id] = r; });
     var out = {};
-    stdIds.forEach(function (id) { out[id] = rowStatus_(map[id]); });
+    stdIds.forEach(function (id) { out[id] = rowStatus_(map[pre + id]); });
     return out;
   }
 
   /* ---------- ตรวจ PIN (ใช้ในเช็คชื่อ/ส่งงาน/สอบ ขั้นถัดไป) ---------- */
-  function verify(stdId, pin) {
-    stdId = String(stdId);
+  /** k = key(courseId, stdId) · ยังไม่มี PIN = E_PIN_NONE (ตั้งเองได้) · อาจารย์ออกรหัสชั่วคราวไว้ = E_PIN_NEEDTEMP */
+  function verify(k, pin) {
+    k = String(k);
     pin = validPin_(pin);
-    assertNotLocked_(stdId);
-    var r = Db.byId('StudentPIN', stdId);
-    if (!r || !r.hash) throw U.E('E_PIN_NONE');
-    if (!U.safeEq(hash_(stdId, pin, r.salt), r.hash)) fail_(stdId, 'E_PIN_BAD', 'PIN ไม่ถูกต้อง');
-    clearFail_(stdId);
+    assertNotLocked_(k);
+    var r = Db.byId('StudentPIN', k);
+    if (!r || !r.hash) throw U.E(rowStatus_(r) === 'temp' ? 'E_PIN_NEEDTEMP' : 'E_PIN_NONE');
+    if (!U.safeEq(hash_(k, pin, r.salt), r.hash)) fail_(k, 'E_PIN_BAD', 'PIN ไม่ถูกต้อง');
+    clearFail_(k);
     return true;
   }
 
-  function write_(stdId, patch) {
-    var r = Db.byId('StudentPIN', stdId);
+  function write_(k, patch) {
+    var r = Db.byId('StudentPIN', k);
     var base = { hash: '', salt: '', set_at: '', temp_hash: '', temp_salt: '', temp_expires_at: '' };
-    if (r) Db.update('StudentPIN', stdId, Object.assign(base, patch));
-    else Db.insert('StudentPIN', Object.assign({ std_id: stdId }, base, patch));
+    if (r) Db.update('StudentPIN', k, Object.assign(base, patch));
+    else Db.insert('StudentPIN', Object.assign({ std_id: k }, base, patch));
   }
-  function setHash_(stdId, newPin) {
+  function setHash_(k, newPin) {
     var salt = U.randomHex(8);
-    write_(stdId, { hash: hash_(stdId, newPin, salt), salt: salt, set_at: U.nowIso() });
+    write_(k, { hash: hash_(k, newPin, salt), salt: salt, set_at: U.nowIso() });
   }
 
-  /** ตั้ง PIN ครั้งแรกโดยไม่ต้องมีรหัสชั่วคราว (ใช้เฉพาะตอนเช็คชื่อในห้องครั้งแรก — ขั้นเช็คชื่อ) */
-  function setInitial(stdId, newPin) {
-    stdId = String(stdId);
+  /** ตั้ง PIN ครั้งแรกของภาคเรียนโดยไม่ต้องมีรหัสชั่วคราว (ตอนเช็คชื่อ) · k = key(courseId, stdId) */
+  function setInitial(k, newPin) {
+    k = String(k);
     newPin = validPin_(newPin);
-    var r = Db.byId('StudentPIN', stdId);
+    var r = Db.byId('StudentPIN', k);
     if (r && r.hash) throw U.E('E_BAD_REQUEST', { why: 'pin_exists' });
-    setHash_(stdId, newPin);
+    setHash_(k, newPin);
   }
 
   /** รหัสนักศึกษาจากหน้าเว็บ (ไม่ล็อกอิน) → รูปแบบมาตรฐาน; รูปแบบเพี้ยน = หาไม่พบ (ไม่บอกใบ้) */
@@ -126,16 +134,32 @@ var Pin = (function () {
   function setWithTemp(a) {
     var stdId = norm_(a.stdId);
     inCourse_(a.courseId, stdId);
+    var k = key(a.courseId, stdId);
     var tempPin = validPin_(a.tempPin), newPin = validPin_(a.newPin);
-    assertNotLocked_(stdId);
-    var r = Db.byId('StudentPIN', stdId);
+    assertNotLocked_(k);
+    var r = Db.byId('StudentPIN', k);
     var exp = r ? U.toDate(r.temp_expires_at) : null;
     if (!r || !r.temp_hash || !exp || exp.getTime() <= Date.now() ||
-        !U.safeEq(hash_(stdId, tempPin, r.temp_salt), r.temp_hash)) {
-      fail_(stdId, 'E_PIN_TEMP', 'รหัสชั่วคราวไม่ถูกต้องหรือหมดอายุ');
+        !U.safeEq(hash_(k, tempPin, r.temp_salt), r.temp_hash)) {
+      fail_(k, 'E_PIN_TEMP', 'รหัสชั่วคราวไม่ถูกต้องหรือหมดอายุ');
     }
-    setHash_(stdId, newPin);              // เขียนทับ → temp_* ถูกล้าง (ใช้ได้ครั้งเดียว)
-    clearFail_(stdId);
+    setHash_(k, newPin);                  // เขียนทับ → temp_* ถูกล้าง (ใช้ได้ครั้งเดียว)
+    clearFail_(k);
+    resolveRequests_(null, stdId);
+    return { ok: true };
+  }
+
+  /** นักศึกษาตั้ง PIN เองตอนเข้าระบบครั้งแรกของภาคเรียน (ไม่ต้องมีรหัสชั่วคราว)
+   *  มี PIN แล้ว = E_PIN_EXISTS · อาจารย์ออกรหัสชั่วคราวไว้ (รีเซ็ต) = ต้องใช้รหัสนั้น E_PIN_NEEDTEMP */
+  function setFirst(a) {
+    var stdId = norm_(a.stdId);
+    inCourse_(a.courseId, stdId);
+    var k = key(a.courseId, stdId), newPin = validPin_(a.newPin);
+    var st = status(k);
+    if (st === 'set') throw U.E('E_PIN_EXISTS');
+    if (st === 'temp') throw U.E('E_PIN_NEEDTEMP');
+    setHash_(k, newPin);
+    clearFail_(k);
     resolveRequests_(null, stdId);
     return { ok: true };
   }
@@ -145,8 +169,9 @@ var Pin = (function () {
     inCourse_(a.courseId, stdId);
     var oldPin = validPin_(a.oldPin), newPin = validPin_(a.newPin);
     if (oldPin === newPin) throw U.E('E_PIN_SAME');
-    verify(stdId, oldPin);
-    setHash_(stdId, newPin);
+    var k = key(a.courseId, stdId);
+    verify(k, oldPin);
+    setHash_(k, newPin);
     return { ok: true };
   }
 
@@ -188,7 +213,7 @@ var Pin = (function () {
     var roster = Db.findRows('Students', 'course_id', course.course_id);
     var targets;
     if (U.bool(a.all)) {
-      var st = statuses(roster.map(function (s) { return s.std_id; }));
+      var st = statuses(course.course_id, roster.map(function (s) { return s.std_id; }));
       targets = roster.filter(function (s) { return st[s.std_id] === 'none'; });
     } else {
       var id = Students.cleanId(U.req(a.stdId, 'stdId'));
@@ -196,29 +221,30 @@ var Pin = (function () {
       if (!targets.length) throw U.E('E_NOT_FOUND');
     }
     var exp = U.fmt(new Date(Date.now() + TEMP_DAYS * 86400000));
-    var existing = {};
+    var existing = {}, pre = key(course.course_id, ''), keys = [];
     Db.all('StudentPIN').forEach(function (r) { existing[r.std_id] = r; });
     var patches = {}, inserts = [], codes = [];
     targets.forEach(function (s) {
-      var code = code4_(), salt = U.randomHex(8);
-      var vals = { hash: '', salt: '', set_at: '', temp_hash: hash_(s.std_id, code, salt), temp_salt: salt, temp_expires_at: exp };
-      var r = existing[s.std_id];
-      if (r) patches[r._row] = vals; else inserts.push(Object.assign({ std_id: s.std_id }, vals));
+      var k = pre + s.std_id, code = code4_(), salt = U.randomHex(8);
+      var vals = { hash: '', salt: '', set_at: '', temp_hash: hash_(k, code, salt), temp_salt: salt, temp_expires_at: exp };
+      var r = existing[k];
+      if (r) patches[r._row] = vals; else inserts.push(Object.assign({ std_id: k }, vals));
       codes.push({ stdId: s.std_id, name: s.name, pin: code });
-      clearFail_(s.std_id);
+      keys.push(k);
+      clearFail_(k);
     });
     if (Object.keys(patches).length) Db.bulkPatch('StudentPIN', patches);
     if (inserts.length) Db.insertMany('StudentPIN', inserts);
     codes.forEach(function (c) { resolveRequests_(course.course_id, c.stdId); });
-    Attendance.forgetDevices(codes.map(function (c) { return c.stdId; }));      // รีเซ็ต PIN = ต้องยืนยัน PIN ใหม่บนทุกเครื่อง
+    Attendance.forgetDevices(keys);      // รีเซ็ต PIN = ต้องยืนยัน PIN ใหม่บนทุกเครื่อง
     Courses.touch(course.course_id);
     Audit.log(user.email, 'pin.issueTemp', course.course_id, { count: codes.length, all: U.bool(a.all) });
     return { codes: codes, expiresAt: exp, skipped: U.bool(a.all) ? roster.length - codes.length : 0 };
   }
 
   return {
-    status: status, statuses: statuses, verify: verify, setInitial: setInitial,
-    setWithTemp: setWithTemp, change: change, request: request,
+    key: key, status: status, statuses: statuses, verify: verify, setInitial: setInitial,
+    setWithTemp: setWithTemp, setFirst: setFirst, change: change, request: request,
     issueTemp: issueTemp, openRequestIds: openRequestIds
   };
 })();

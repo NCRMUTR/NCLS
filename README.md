@@ -41,7 +41,7 @@ hbt-teaching-system/
 |---|---|
 | รายวิชา | อาจารย์สร้างวิชาของตัวเองในภาคเรียนปัจจุบัน (รหัส+ชื่อ+กลุ่ม) · เจ้าของคนเดียว · admin ดู/ช่วยแก้ได้ทุกวิชา · เจ้าของวิชากด **ลบรายวิชานี้** ที่หน้าวิชาได้ (ถาวร พิมพ์รหัสวิชา-กลุ่มยืนยัน) · admin ลบทีละหลายวิชาที่หน้า *ลบข้อมูลสิ้นภาคเรียน* — ขั้น 6 |
 | นักศึกษา | เพิ่มทีละคน หรือ **นำเข้า CSV / วางจาก Excel** (ตรวจก่อนบันทึก · เพิ่มและอัปเดต หรือ แทนที่ทั้งรายชื่อ · แถวเสียถูกข้ามพร้อมเหตุผล) · ลบถาวรพร้อมแสดงสิ่งที่จะหาย |
-| PIN นักศึกษา | 4 หลัก เก็บเฉพาะแฮช · ใช้ข้ามวิชา · **ตั้งครั้งแรก/ลืม = ใช้รหัสชั่วคราวที่อาจารย์ออกให้** (ครั้งเดียว อายุ 7 วัน) · ใส่ผิดเกินกำหนดล็อกชั่วคราว (ตั้งค่าได้) · หน้า `s/pin.html` ไม่ต้องล็อกอิน |
+| PIN นักศึกษา | 4 หลัก เก็บเฉพาะแฮช · **1 คน 1 PIN ต่อภาคเรียน** ใช้ข้ามวิชาในภาคนั้น · **ตั้งเองตอนเข้าระบบครั้งแรกของภาคเรียน** (`pin.setFirst` / ตอนเช็คชื่อ) · ลืม = รหัสชั่วคราวที่อาจารย์ออกให้ (ครั้งเดียว อายุ 7 วัน) · ใส่ผิดเกินกำหนดล็อกชั่วคราว (ตั้งค่าได้) · หน้า `s/pin.html` ไม่ต้องล็อกอิน |
 | คะแนน | ประเภทคะแนน (เต็ม + น้ำหนัก %, รวมไม่เกิน 100%) · ตารางกรอก/วางจาก Excel · คะแนนรวมถ่วงน้ำหนัก · ส่งออก CSV (กัน formula injection) · รองรับประเภทอัตโนมัติ (เช็คชื่อ/สอบ/งาน) ที่ระบบอื่นจะเขียนให้ |
 
 **เพิ่มในขั้น 3 — เช็คชื่อ** (`t/att.html` ต่อวิชา · `s/scan.html` นักศึกษา)
@@ -429,7 +429,7 @@ POST {CORE_URL}   Content-Type: text/plain;charset=utf-8     (ไม่เกิ
 | `reset.term` | admin | lock | `{termId, confirm: ชื่อภาคเรียน}` ลบภาคเรียนที่ว่างและไม่ใช่ปัจจุบัน |
 | `reset.pins` | admin | lock | `{dryRun?}` ลบ PIN+เครื่องที่จำไว้ของคนที่ไม่เหลืออยู่ในวิชาใด |
 | `pub.teachers` / `pub.courses` / `pub.students` | — (สาธารณะ) | | สำหรับหน้า PIN: ไม่เปิดเผยอีเมล/สถานะ PIN |
-| `pin.setWithTemp` / `pin.change` / `pin.request` | — (สาธารณะ) | lock | ตั้งด้วยรหัสชั่วคราว / เปลี่ยน / ขอรีเซ็ต (ไม่ใช้ opId: การลองผิดต้องนับทุกครั้ง) |
+| `pin.setFirst` / `pin.setWithTemp` / `pin.change` / `pin.request` | — (สาธารณะ) | lock | ตั้งเองครั้งแรกของภาคเรียน `{courseId,stdId,newPin}` (มี PIN แล้ว E_PIN_EXISTS · รอรหัสชั่วคราว E_PIN_NEEDTEMP) / ตั้งด้วยรหัสชั่วคราว / เปลี่ยน / ขอรีเซ็ต (ไม่ใช้ opId: การลองผิดต้องนับทุกครั้ง) |
 
 รหัส error: `E_AUTH` (หมดอายุ/token ไม่ถูกต้อง) · `E_DISABLED` · `E_FORBIDDEN` · `E_BAD_TOKEN` · `E_DOMAIN` · `E_NOT_LISTED` · `E_NOT_SETUP` · `E_BAD_REQUEST` · `E_REQUIRED` · `E_EMAIL` · `E_EMAIL_DOMAIN` · `E_ROLE` · `E_LAST_ADMIN` · `E_SETTING` · `E_TERM_NAME` · `E_TERM_DUP` · `E_BUSY` · `E_NOT_FOUND` · `E_NO_TERM` · `E_COURSE_FIELD` · `E_COURSE_DUP` · `E_STD_ID` · `E_STD_NAME` · `E_STUDENT_DUP` · `E_IMPORT` · `E_PIN_FORMAT` · `E_PIN_BAD` · `E_PIN_LOCKED` · `E_PIN_NONE` · `E_PIN_TEMP` · `E_PIN_SAME` · `E_SCORE_TYPE` · `E_SCORE_PCT` · `E_SCORE_VALUE` · `E_SCORE_AUTO` · `E_ATT_CLOSED` · `E_ATT_PAUSED` · `E_ATT_GPS_REQUIRED` · `E_ATT_OUT_OF_RANGE` · `E_ATT_DEVICE` · `E_ATT_DEVICE_CONFLICT` · `E_ATT_PIN_REQUIRED` (`detail.mode`) · `E_ATT_OPEN_EXISTS` · `E_ATT_STILL_OPEN` · `E_ATT_TIME` · `E_ATT_LOC` · `E_ATT_STATUS` · `E_ATT_STATE` · `E_ATT_REQ` · `E_DRIVE` · `E_ASG_FIELD` · `E_ASG_KIND_LOCKED` · `E_ASG_MAX_LOW` · `E_ASG_CLOSED` · `E_ASG_GRADED` · `E_ASG_NOT_GROUP` · `E_ASG_NO_GROUP` · `E_ASG_NOT_REP` · `E_ASG_GROUP` · `E_ASG_HAS_SUB` · `E_ASG_FILE_TYPE` · `E_ASG_FILE_SIZE` · `E_ASG_FILE_COUNT` · `E_ASG_FILE_BAD` · `E_COURSE_RESETTING` (วิชากำลังถูกลบ) · `E_RESET_CONFIRM` (`detail.expect`) · `E_TERM_CURRENT` · `E_TERM_HAS_COURSES`
 

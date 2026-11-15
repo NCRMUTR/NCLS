@@ -12,7 +12,7 @@
 
   app.innerHTML =
     '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Learning System</a>' +
-    '<h1>ตั้ง / เปลี่ยน PIN</h1><p class="muted">PIN 4 หลักของคุณใช้ยืนยันตัวตนตอนเช็คชื่อ ส่งงาน และทำข้อสอบ — ใช้ร่วมกันทุกวิชา</p></div>' +
+    '<h1>ตั้ง / เปลี่ยน PIN</h1><p class="muted">PIN 4 หลักของคุณใช้ยืนยันตัวตนตอนเช็คชื่อ ส่งงาน และทำข้อสอบ — ใช้ร่วมกันทุกวิชาในภาคเรียนนี้ (ภาคเรียนใหม่ตั้งใหม่)</p></div>' +
     '<section class="card stack" id="pick"><h2>คุณคือใคร</h2>' +
     '<div class="field"><label for="selT">อาจารย์ผู้สอน</label><select id="selT"><option value="">กำลังโหลด…</option></select></div>' +
     '<div class="field"><label for="selC">รายวิชา</label><select id="selC" disabled><option value="">เลือกอาจารย์ก่อน</option></select></div>' +
@@ -24,8 +24,8 @@
     '<button type="button" role="tab" id="tab-first" data-tab="first" aria-selected="true">ตั้ง PIN ครั้งแรก</button>' +
     '<button type="button" role="tab" id="tab-change" data-tab="change" aria-selected="false">เปลี่ยน PIN</button>' +
     '<button type="button" role="tab" id="tab-forgot" data-tab="forgot" aria-selected="false">ลืม PIN</button></div>' +
-    '<div id="p-first" class="stack"><p class="small muted">ขอ “รหัสชั่วคราว 4 หลัก” จากอาจารย์ แล้วใส่ที่นี่พร้อมตั้ง PIN ใหม่ของคุณ (ใช้ได้ครั้งเดียว มีอายุ 7 วัน)</p>' +
-    '<div class="field"><label for="f-temp">รหัสชั่วคราวจากอาจารย์</label><input class="pin-in" id="f-temp" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></div>' +
+    '<div id="p-first" class="stack"><p class="small muted">ยังไม่เคยตั้ง PIN ในภาคเรียนนี้ — ตั้งได้เลย ไม่ต้องรอรหัสจากอาจารย์ · ถ้าอาจารย์ออก “รหัสชั่วคราว” ให้คุณ (เช่น ลืม PIN) ให้ใส่รหัสนั้นในช่องแรก</p>' +
+    '<div class="field"><label for="f-temp">รหัสชั่วคราวจากอาจารย์ (ถ้ามี)</label><input class="pin-in" id="f-temp" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></div>' +
     '<div class="field"><label for="f-new">PIN ใหม่ (ตัวเลข 4 หลัก)</label><input class="pin-in" id="f-new" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></div>' +
     '<div class="field"><label for="f-new2">ยืนยัน PIN ใหม่</label><input class="pin-in" id="f-new2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password"></div>' +
     '<button class="btn primary block" type="button" id="goFirst">ตั้ง PIN</button></div>' +
@@ -107,11 +107,11 @@
   $('#goFirst').addEventListener('click', function () {
     var t = $('#f-temp').value, n = $('#f-new').value, n2 = $('#f-new2').value;
     clearMsgs();
-    if (!chk(t)) { $('#actErr').textContent = 'รหัสชั่วคราวต้องเป็นตัวเลข 4 หลัก'; return; }
+    if (t && !chk(t)) { $('#actErr').textContent = 'รหัสชั่วคราวต้องเป็นตัวเลข 4 หลัก (หรือเว้นว่างถ้าไม่มี)'; return; }
     if (!chk(n)) { $('#actErr').textContent = 'PIN ใหม่ต้องเป็นตัวเลข 4 หลัก'; return; }
     if (n !== n2) { $('#actErr').textContent = 'PIN ใหม่ทั้งสองช่องไม่ตรงกัน'; return; }
-    var a = base(); a.tempPin = t; a.newPin = n;
-    HBT.busy(this, function () { return HBT.api.call('pin.setWithTemp', a).then(function () { done('ตั้ง PIN เรียบร้อยแล้ว ' + name() + ' — จำ PIN นี้ไว้ใช้ตอนเช็คชื่อ ส่งงาน และสอบ'); }); })
+    var a = base(); a.newPin = n; if (t) a.tempPin = t;
+    HBT.busy(this, function () { return HBT.api.call(t ? 'pin.setWithTemp' : 'pin.setFirst', a).then(function () { done('ตั้ง PIN เรียบร้อยแล้ว ' + name() + ' — จำ PIN นี้ไว้ใช้ตอนเช็คชื่อ ส่งงาน และสอบ'); }); })
       .catch(function (e) { fail('#actErr', e); });
   });
   $('#goChange').addEventListener('click', function () {

@@ -390,12 +390,12 @@ test('ลบทั้งภาคเรียนทีละวิชา: คร
 test('reset.pins: PIN ของคนที่ไม่เหลือในวิชาใดเลยถูกลบ (dryRun ดูก่อนได้) · คนที่ยังอยู่วิชาอื่นยังอยู่ · เครื่องที่จำไว้ถูกลบตาม', () => {
   const P = full(); const core = P.core;
   ok(core.api(P.T1, 'pin.issueTemp', { courseId: P.cid, all: true }));
-  core.state.sheets.StudentDevices.data.push(['d1', std(3), 'dev', 'x', 'y']);
+  core.state.sheets.StudentDevices.data.push(['d1', core.ctx().Pin.key(P.cid, std(3)), 'dev', 'x', 'y']);
   resetAll(P, P.cid);                       // std(1) ยังอยู่วิชา 2 · std(2..4) หลุดหมด (std(90) ไม่มี PIN)
   const dry = ok(core.api(P.A, 'reset.pins', { dryRun: true })); assert.strictEqual(dry.orphans, 3);
   assert.strictEqual(rowsOf(P, 'StudentPIN').length, 4);
   const r = ok(core.api(P.A, 'reset.pins', {})); assert.strictEqual(r.removedPin, 3); assert.strictEqual(r.removedDevices, 1);
-  assert.deepStrictEqual(rowsOf(P, 'StudentPIN').map(x => x[0]), [std(1)]);
+  assert.deepStrictEqual(rowsOf(P, 'StudentPIN').map(x => x[0]), [core.ctx().Pin.key(P.cid2, std(1))]);
   assert.strictEqual(code(core.api('', 'stu.login', { courseId: P.cid2, stdId: std(1), pin: PIN })), 'OK');
   assert.strictEqual(ok(core.api(P.A, 'reset.pins', {})).orphans, 0);
 });

@@ -72,7 +72,7 @@ var Courses = (function () {
     var counts = studentCounts_();
     var c = out_(r, counts);
     var roster = Db.findRows('Students', 'course_id', r.course_id);
-    var st = Pin.statuses(roster.map(function (s) { return s.std_id; }));
+    var st = Pin.statuses(r.course_id, roster.map(function (s) { return s.std_id; }));
     c.pinSet = roster.filter(function (s) { return st[s.std_id] === 'set'; }).length;
     c.scoreTypes = Db.all('ScoreTypes').filter(function (t) { return t.course_id === r.course_id; }).length;
     return c;

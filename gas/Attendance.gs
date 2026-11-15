@@ -313,16 +313,16 @@ var Attendance = (function () {
 
     // PIN: เครื่องใหม่ของนักศึกษาคนนี้ต้องยืนยัน PIN (ตั้ง PIN ครั้งแรกได้ที่นี่)
     // (ตั้งค่า att_require_pin = 0 → ข้ามทั้งหมด: ไม่ถาม PIN และไม่ให้ตั้ง PIN ตอนเช็คชื่อ)
-    var mode = '';
+    var mode = '', pk = Pin.key(s.course_id, std);       // PIN/เครื่องที่ยืนยันแล้ว แยกตามภาคเรียน
     if (Settings.get('att_require_pin') !== '0') {
-      var trusted = trustedDevices_(std).some(function (t) { return t.device_id === dev; });
-      var pst = Pin.status(std);
+      var trusted = trustedDevices_(pk).some(function (t) { return t.device_id === dev; });
+      var pst = Pin.status(pk);
       if (pst === 'set') { if (!trusted) mode = 'enter'; }
       else mode = (pst === 'temp') ? 'temp' : 'set';
     }
     if (mode === 'enter') {
       if (a.pin === undefined || a.pin === null || a.pin === '') throw U.E('E_ATT_PIN_REQUIRED', { mode: 'enter' });
-      U.lock(function () { Db.flush(); Pin.verify(std, a.pin); }, 30000);   // นับครั้งที่ผิดใน lock (ยิงขนานก็นับครบ) · ผิด/ล็อก → โยน E_PIN_BAD / E_PIN_LOCKED
+      U.lock(function () { Db.flush(); Pin.verify(pk, a.pin); }, 30000);   // นับครั้งที่ผิดใน lock (ยิงขนานก็นับครบ) · ผิด/ล็อก → โยน E_PIN_BAD / E_PIN_LOCKED
     } else if (mode === 'set') {
       if (a.newPin === undefined || a.newPin === null || a.newPin === '') throw U.E('E_ATT_PIN_REQUIRED', { mode: 'set' });
     } else if (mode === 'temp') {
@@ -345,7 +345,7 @@ var Attendance = (function () {
         if (!approval) throw U.E('E_ATT_DEVICE_CONFLICT', { usedByName: nameOf_(cur.course_id, own.std_id) });
       }
       var pinJustSet = false;
-      if (mode === 'set') { Pin.setInitial(std, a.newPin); pinJustSet = true; }
+      if (mode === 'set') { Pin.setInitial(pk, a.newPin); pinJustSet = true; }
       else if (mode === 'temp') { Pin.setWithTemp({ courseId: cur.course_id, stdId: std, tempPin: a.tempPin, newPin: a.newPin }); pinJustSet = true; }
 
       var ph = phase_(cur, Date.now()), status = (ph.hasConfig && ph.phase === 'late') ? 'late' : 'normal';
@@ -358,7 +358,7 @@ var Attendance = (function () {
       });
       if (!own) Db.insert('AttDevices', { dev_key: sid + '|' + dev, session_id: sid, course_id: cur.course_id, device_id: dev, std_id: std, at: now });
       if (approval) Db.update('AttApprovals', approval.req_id, { status: 'used' });
-      rememberDevice_(std, dev, now);
+      rememberDevice_(pk, dev, now);
       return { status: status, name: student.name, already: false, pinJustSet: pinJustSet };
     }, 30000);
   }

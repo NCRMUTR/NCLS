@@ -134,7 +134,7 @@ var Auth = (function () {
     try { std = Students.cleanId(a.stdId); } catch (e) { throw U.E('E_NOT_FOUND'); }
     var st = Students.find(courseId, std);
     if (!st) throw U.E('E_NOT_FOUND');
-    Pin.verify(std, a.pin);
+    Pin.verify(Pin.key(courseId, std), a.pin);
     var ttl = 2 * 3600;
     return {
       token: mint('s', { c: courseId, s: std }, ttl), expiresAt: Date.now() + ttl * 1000,

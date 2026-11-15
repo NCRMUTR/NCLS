@@ -56,7 +56,7 @@ var Db = (function () {
         ['row_key', T.TEXT, 260], ['course_id', T.TEXT, 170], ['std_id', T.TEXT, 130], ['name', T.TEXT, 260], ['added_at', T.DATETIME, 160]
       ]
     },
-    StudentPIN: {                     // 1 คน 1 PIN ใช้ทุกวิชา/ทุกระบบ · เก็บเฉพาะแฮช (SHA-256 + salt + pepper)
+    StudentPIN: {                     // 1 คน 1 PIN ต่อภาคเรียน (std_id = "termId|stdId") ใช้ทุกวิชา/ทุกระบบในภาคนั้น · เก็บเฉพาะแฮช (SHA-256 + salt + pepper)
       pk: 'std_id',
       cols: [
         ['std_id', T.TEXT, 130], ['hash', T.TEXT, 300], ['salt', T.TEXT, 140], ['set_at', T.DATETIME, 160],
@@ -107,7 +107,7 @@ var Db = (function () {
         ['dev_key', T.TEXT, 300], ['session_id', T.TEXT, 170], ['course_id', T.TEXT, 170], ['device_id', T.TEXT, 280], ['std_id', T.TEXT, 130], ['at', T.DATETIME, 160]
       ]
     },
-    StudentDevices: {                 // เครื่องที่นักศึกษาเคยยืนยัน PIN แล้ว (จำไว้ไม่เกิน 3 เครื่อง) · dev_key = std_id|device_id
+    StudentDevices: {                 // เครื่องที่นักศึกษาเคยยืนยัน PIN แล้ว (จำไว้ไม่เกิน 3 เครื่อง) · std_id = "termId|stdId" · dev_key = std_id|device_id
       pk: 'dev_key',
       cols: [
         ['dev_key', T.TEXT, 320], ['std_id', T.TEXT, 130], ['device_id', T.TEXT, 280], ['first_at', T.DATETIME, 160], ['last_at', T.DATETIME, 160]
