@@ -16,9 +16,9 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
   ctx.content.insertAdjacentHTML('beforeend',
     '<div id="head"></div>' +
     '<div class="row sp" id="toolbar" hidden>' +
-    '<div class="field grow" style="max-width:340px"><label class="sr" for="q">ค้นหา</label><input id="q" type="search" placeholder="ค้นหารหัสหรือชื่อ" autocomplete="off"></div>' +
     '<div class="row"><button class="btn" type="button" id="addBtn">เพิ่มนักศึกษา</button><button class="btn" type="button" id="impBtn">นำเข้า CSV</button>' +
     '<button class="btn primary" type="button" id="allBtn">ออกรหัสให้คนที่ยังไม่ตั้ง PIN</button></div></div>' +
+    '<div id="lkBar" hidden></div>' +
     '<div id="listBox"><div class="loading"><span class="spin"></span> กำลังโหลด…</div></div>' +
 
     /* เพิ่ม/แก้ไข */
@@ -53,6 +53,24 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     '<h2 id="cTitle">ยืนยัน</h2><div id="cBody"></div><div class="err" id="cErr" role="alert"></div>' +
     '<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close type="button">ยกเลิก</button><button class="btn danger" type="button" id="cGo">ยืนยัน</button></div></div></div>');
 
+  var PIN_ORD = { none: 1, temp: 2, set: 3 };
+  var kit = HBT.listKit({
+    id: function (s) { return s.stdId; },
+    search: function (s) { return s.stdId + ' ' + s.name; },
+    sorts: [
+      { k: 'id', label: 'รหัสนักศึกษา', fn: function (s) { return s.stdId; } },
+      { k: 'name', label: 'ชื่อ-นามสกุล', fn: function (s) { return s.name; } },
+      { k: 'pin', label: 'สถานะ PIN (ยังไม่ตั้งก่อน)', fn: function (s) { return s.resetRequested ? 0 : (PIN_ORD[s.pinStatus] === undefined ? 1 : PIN_ORD[s.pinStatus]); } }
+    ],
+    sort: 'id', noun: 'คน',
+    bulk: [
+      { label: 'ออกรหัสชั่วคราวที่เลือก', run: function () { bulkIssue(); } },
+      { label: 'ลบที่เลือก', cls: 'danger', run: function () { bulkDelete(); } }
+    ]
+  });
+  kit.mount($('#lkBar'), function () { if (data) renderList(); });
+  kit.bindList($('#listBox'));
+
   function counts() {
     var c = data.counts;
     return '<div class="row" id="counts"><span class="pill info">ทั้งหมด ' + c.total + ' คน</span><span class="pill good">ตั้ง PIN แล้ว ' + c.set + '</span>' +
@@ -68,28 +86,30 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
   }
 
   function renderList() {
-    var q = $('#q').value.trim().toLowerCase();
-    var rows = data.students.filter(function (s) { return !q || s.stdId.toLowerCase().indexOf(q) >= 0 || s.name.toLowerCase().indexOf(q) >= 0; });
+    $('#lkBar').hidden = !data.students.length;
+    var rows = kit.view(data.students);
     if (!data.students.length) {
       $('#listBox').innerHTML = '<div class="callout"><b>ยังไม่มีนักศึกษาในรายวิชานี้</b><br>กด “นำเข้า CSV” เพื่อนำเข้ารายชื่อทั้งห้อง หรือ “เพิ่มนักศึกษา” ทีละคน</div>';
+      kit.update([], 0);
       return;
     }
-    if (!rows.length) { $('#listBox').innerHTML = '<div class="callout">ไม่พบรายชื่อที่ตรงกับ “' + esc($('#q').value) + '”</div>'; return; }
-    $('#listBox').innerHTML = '<div class="scroll"><table id="stdTable"><thead><tr><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>PIN</th><th></th></tr></thead><tbody>' +
+    kit.update(rows, data.students.length);
+    if (!rows.length) { $('#listBox').innerHTML = '<div class="callout">ไม่พบรายชื่อที่ตรงกับ “' + esc(kit.st.q) + '”</div>'; return; }
+    $('#listBox').innerHTML = '<div class="scroll"><table id="stdTable"><thead><tr><th class="lk-w"></th><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>PIN</th><th></th></tr></thead><tbody>' +
       rows.map(function (s) {
         var pl = PIN_LABEL[s.pinStatus] || PIN_LABEL.none;
-        return '<tr data-std="' + esc(s.stdId) + '"><td class="mono">' + esc(s.stdId) + '</td><td>' + esc(s.name) + '</td>' +
+        return '<tr data-std="' + esc(s.stdId) + '"' + (kit.st.sel[s.stdId] ? ' class="lk-on"' : '') + '><td class="lk-w">' + kit.cb(s, s.name) + '</td><td class="mono">' + esc(s.stdId) + '</td><td>' + esc(s.name) + '</td>' +
           '<td><span class="pill ' + pl[1] + '">' + pl[0] + '</span>' + (s.resetRequested ? ' <span class="pill bad">ขอรีเซ็ต</span>' : '') + '</td>' +
           '<td><div class="tbl-actions"><button class="btn sm" type="button" data-act="edit">แก้ชื่อ</button>' +
           '<button class="btn sm" type="button" data-act="reset">' + (s.pinStatus === 'set' || s.pinStatus === 'temp' ? 'รีเซ็ต PIN' : 'ออกรหัส') + '</button>' +
           '<button class="btn sm ghost" type="button" data-act="del">ลบ</button></div></td></tr>';
       }).join('') + '</tbody></table></div>' +
-      (rows.length !== data.students.length ? '<p class="help">แสดง ' + rows.length + ' จาก ' + data.students.length + ' คน</p>' : '');
+      '';
   }
 
   function load() {
     return HBT.api.call('student.list', { courseId: id }).then(function (r) {
-      data = r; $('#toolbar').hidden = false; renderHead(); renderList();
+      data = r; kit.prune(r.students); $('#toolbar').hidden = false; renderHead(); renderList();
     }, function (e) {
       var nf = e.code === 'E_NOT_FOUND' || e.code === 'E_FORBIDDEN';
       $('#listBox').innerHTML = '<div class="callout bad"><b>' + (nf ? 'ไม่พบรายวิชานี้ หรือไม่มีสิทธิ์เข้าถึง' : 'โหลดรายชื่อไม่สำเร็จ') + '</b><br>' + esc(HBT.errMsg(e)) + '</div>' +
@@ -193,7 +213,36 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
       }).catch(function (er) { HBT.toast(HBT.errMsg(er), 'bad'); });
     }
   });
-  $('#q').addEventListener('input', function () { if (data) renderList(); });
+
+  /* ---------- คำสั่งกลุ่ม (ที่เลือกไว้) ---------- */
+  function bulkIssue() {
+    var sel = kit.selected(data.students); if (!sel.length) return;
+    var had = sel.filter(function (s) { return s.pinStatus === 'set' || s.pinStatus === 'temp'; }).length;
+    confirmBox('ออกรหัสชั่วคราวให้ ' + sel.length + ' คน?',
+      '<p>ระบบจะออกรหัสชั่วคราวให้นักศึกษาที่เลือก ' + sel.length + ' คน' + (had ? ' — <b>' + had + ' คนมี PIN อยู่แล้ว จะถูกรีเซ็ต</b> (PIN เดิมใช้ไม่ได้ทันที)' : '') + '</p>',
+      'ออกรหัส', !!had, function () {
+        return HBT.api.call('pin.issueTemp', { courseId: id, stdIds: sel.map(function (s) { return s.stdId; }) }, { write: true }).then(function (r) {
+          HBT.modal.close('mConf'); kit.clear(); showCodes(r, 'รหัสชั่วคราวของที่เลือก ' + sel.length + ' คน'); return load();
+        });
+      });
+  }
+  function bulkDelete() {
+    var sel = kit.selected(data.students); if (!sel.length) return;
+    var ids = sel.map(function (s) { return s.stdId; });
+    HBT.busy($('#lkBar').querySelector('[data-lk-bulk="1"]'), function () {
+      return HBT.api.call('student.impactMany', { courseId: id, stdIds: ids }).then(function (im) {
+        var lines = im.items.filter(function (i) { return i.count === null || i.count > 0; }).map(function (i) { return '<li>' + esc(i.label) + (i.count === null ? ' (ถ้ามี)' : ' ' + i.count + ' รายการ') + '</li>'; }).join('');
+        var names = sel.slice(0, 8).map(function (s) { return esc(s.stdId + ' ' + s.name); }).join('<br>') + (sel.length > 8 ? '<br>… และอีก ' + (sel.length - 8) + ' คน' : '');
+        confirmBox('ลบนักศึกษา ' + im.count + ' คนออกจากรายวิชา?',
+          '<p>การลบเป็น<b>ถาวร</b> ไม่มีถังขยะ</p><p class="small">' + names + '</p>' +
+          '<p>ข้อมูลของพวกเขาในวิชานี้ที่จะหายไปด้วย:</p>' + (lines ? '<ul id="impactList">' + lines + '</ul>' : '<p class="muted" id="impactNone">ไม่มีข้อมูลอื่นผูกอยู่</p>') +
+          '<p class="small muted">PIN ของนักศึกษาไม่ถูกลบ (ใช้ในวิชาอื่นต่อได้)</p>',
+          'ลบถาวร ' + im.count + ' คน', true, function () {
+            return HBT.api.call('student.removeMany', { courseId: id, stdIds: ids }, { write: true }).then(function (r) { kit.clear(); HBT.toast('ลบแล้ว ' + r.removed + ' คน', 'good'); return load(); });
+          });
+      });
+    }).catch(function (er) { HBT.toast(HBT.errMsg(er), 'bad'); });
+  }
 
   /* ---------- นำเข้า CSV ---------- */
   function mode() { return HBT.$$('input[name=iMode]').filter(function (r) { return r.checked; })[0].value; }

@@ -91,7 +91,8 @@ var Db = (function () {
         ['session_id', T.TEXT, 170], ['course_id', T.TEXT, 170], ['date', T.TEXT, 110], ['kind', T.TEXT, 80], ['status', T.TEXT, 80],
         ['opened_at', T.DATETIME, 160], ['closed_at', T.DATETIME, 160], ['lat', T.TEXT, 110], ['lng', T.TEXT, 110], ['radius_m', T.TEXT, 90],
         ['start_at', T.DATETIME, 160], ['normal_min', T.TEXT, 90], ['close_min', T.TEXT, 90], ['paused_at', T.DATETIME, 160],
-        ['pause_offset_min', T.TEXT, 100], ['created_by', T.TEXT, 220]
+        ['pause_offset_min', T.TEXT, 100], ['created_by', T.TEXT, 220],
+        ['score_normal', T.TEXT, 90], ['score_late', T.TEXT, 90], ['score_absent', T.TEXT, 90]      // คะแนนต่อคาบ (ว่าง = 1 / 0.5 / 0)
       ]
     },
     AttRecords: {                     // ขาด = ไม่มีแถว · rec_key = session_id|std_id · status: normal | late | leave · source: SCAN | MANUAL | IMPORT
@@ -168,7 +169,7 @@ var Db = (function () {
   };
 
   var FORMAT = { TEXT: '@', JSON: '@', DATETIME: '@', BOOL: '@', NUM: '0.##', INT: '0' };
-  var SCHEMA_VERSION = '0.7.0';
+  var SCHEMA_VERSION = '0.7.1';
 
   var _ss = null, _checked = false, _cache = {}, _props = null, _idx = {};
 

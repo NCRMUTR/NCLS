@@ -16,6 +16,32 @@ HBT.page({ active: 'exam', need: 'exam', crumbs: [['รายวิชาขอ�
   }
   var q = encodeURIComponent(id);
 
+  var EFF_ORD = { SCHEDULED: 0, OPEN: 1, CLOSED: 2 };
+  var kitR = HBT.listKit({
+    id: function (r) { return r.sessionId; },
+    search: function (r) { return r.title + ' ' + r.quizTitle + ' ' + (r.mode === 'TEST' ? 'สอบ' : 'ฝึกทำ'); },
+    sorts: [
+      { k: 'start', label: 'เวลาเปิดให้เข้า', fn: function (r) { return r.startAt || ''; } },
+      { k: 'title', label: 'ชื่อรอบ', fn: function (r) { return r.title; } },
+      { k: 'quiz', label: 'แบบทดสอบ', fn: function (r) { return r.quizTitle; } },
+      { k: 'state', label: 'สถานะ (รอเวลา → เปิด → ปิด)', fn: function (r) { return EFF_ORD[r.effective] === undefined ? 1 : EFF_ORD[r.effective]; } },
+      { k: 'done', label: 'จำนวนที่ทำแล้ว', fn: function (r) { return Number(r.submitted) || 0; } }
+    ],
+    sort: 'start', dir: -1, noun: 'รอบ',
+    bulk: [{ label: 'ลบรอบที่เลือก', cls: 'danger', run: function (ids) { bulkDelRounds(ids); } }]
+  });
+  var kitZ = HBT.listKit({
+    id: function (z) { return z.quizId; },
+    search: function (z) { return z.title + ' ' + (z.note || ''); },
+    sorts: [
+      { k: 'title', label: 'ชื่อแบบทดสอบ', fn: function (z) { return z.title; } },
+      { k: 'count', label: 'จำนวนข้อ', fn: function (z) { return Number(z.questionCount) || 0; } },
+      { k: 'rounds', label: 'จำนวนรอบที่ใช้', fn: function (z) { return Number(z.rounds) || 0; } }
+    ],
+    sort: 'title', noun: 'ชุด',
+    bulk: [{ label: 'ลบแบบทดสอบที่เลือก', cls: 'danger', run: function (ids) { bulkDelQuizzes(ids); } }]
+  });
+
   ctx.content.insertAdjacentHTML('beforeend', '<div id="box" class="stack"><div class="loading"><span class="spin"></span> กำลังโหลด…</div></div>' +
     /* สร้าง/แก้ แบบทดสอบ */
     '<div class="modal" id="mQuiz" hidden role="dialog" aria-modal="true" aria-labelledby="zTitle"><div class="mbox stack">' +
@@ -82,37 +108,86 @@ HBT.page({ active: 'exam', need: 'exam', crumbs: [['รายวิชาขอ�
     HBT.$$('[data-tab]').forEach(function (b) { b.addEventListener('click', function () { tab = b.getAttribute('data-tab'); render(); }); });
     var nr = $('#newRound'); if (nr) nr.addEventListener('click', openRound);
     var nq = $('#newQuiz'); if (nq) nq.addEventListener('click', function () { openQuiz(null); });
-    HBT.$$('[data-msg]').forEach(function (b) { b.addEventListener('click', function () { openMsg(b.getAttribute('data-msg')); }); });
-    HBT.$$('[data-st]').forEach(function (b) { b.addEventListener('click', function () { setStatus(b); }); });
-    HBT.$$('[data-sync]').forEach(function (b) { b.addEventListener('click', function () { resync(b); }); });
-    HBT.$$('[data-zedit]').forEach(function (b) { b.addEventListener('click', function () { openQuiz(b.getAttribute('data-zedit')); }); });
-    HBT.$$('[data-zdel]').forEach(function (b) { b.addEventListener('click', function () { delQuiz(b); }); });
+    mountKit();
     var go = $('#goQuizzes'); if (go) go.addEventListener('click', function () { tab = 'quizzes'; render(); });
   }
 
   function roundsHtml() {
     if (!quizzes.length) return '<div class="card stack-s" id="emptyQ"><h3>เริ่มจากสร้างแบบทดสอบ</h3><p class="small muted">แบบทดสอบคือชุดข้อสอบ (ใช้ซ้ำได้หลายรอบ) — สร้างและใส่ข้อสอบก่อน แล้วค่อยสร้างรอบ</p><div><button class="btn primary" type="button" id="goQuizzes">ไปที่แบบทดสอบ</button></div></div>';
     if (!rounds.length) return '<div class="card stack-s" id="empty"><h3>ยังไม่มีรอบ</h3><p class="small muted">กด “สร้างรอบสอบ / ฝึกทำ” เพื่อกำหนดเวลาและเงื่อนไข ระบบจะออกลิงก์ให้นักศึกษา</p></div>';
-    return '<div class="stack" id="list">' + rounds.map(function (r) {
-      return '<div class="card stack-s" data-round="' + esc(r.sessionId) + '"><div class="row sp"><h3>' + esc(r.title) + '</h3><div class="row"><span class="pill ' + (r.mode === 'TEST' ? 'acc' : 'info') + '">' + (r.mode === 'TEST' ? 'สอบ' : 'ฝึกทำ') + '</span>' + effPill(r.effective) + '</div></div>' +
+    return '<div id="lkBar"></div><div class="stack" id="list"></div>';
+  }
+  function roundItems() {
+    var vis = kitR.view(rounds);
+    kitR.update(vis, rounds.length);
+    if (!vis.length) return '<div class="callout">ไม่พบรอบที่ตรงกับ “' + esc(kitR.st.q) + '”</div>';
+    return vis.map(function (r) {
+      return '<div class="card stack-s' + (kitR.st.sel[r.sessionId] ? ' lk-on' : '') + '" data-round="' + esc(r.sessionId) + '"><div class="row sp"><div class="row">' + kitR.cb(r, r.title) + '<h3>' + esc(r.title) + '</h3></div><div class="row"><span class="pill ' + (r.mode === 'TEST' ? 'acc' : 'info') + '">' + (r.mode === 'TEST' ? 'สอบ' : 'ฝึกทำ') + '</span>' + effPill(r.effective) + '</div></div>' +
         '<p class="small muted">' + esc(r.quizTitle) + ' · ' + esc(fmt(r.startAt)) + ' – ' + esc(fmt(r.endAt)) + (r.totalMinutes ? ' · ' + r.totalMinutes + ' นาที' : '') + esc(scoreTxt(r)) + '</p>' +
         '<div class="row small"><span class="pill ' + (r.submitted ? 'good' : '') + '">ทำแล้ว ' + r.submitted + ' / ' + r.attempts + ' ฉบับ</span>' + syncPill(r) + '</div>' +
         '<div class="row"><a class="btn primary sm" href="' + root + 't/exam-round.html?r=' + encodeURIComponent(r.sessionId) + '&id=' + q + '">ติดตาม / ผลสอบ</a>' +
         '<button class="btn sm" type="button" data-msg="' + esc(r.sessionId) + '">แจ้งนักศึกษา</button>' +
         (r.effective === 'CLOSED' ? '' : (r.effective === 'SCHEDULED' ? '<button class="btn sm" type="button" data-st="OPEN" data-sid="' + esc(r.sessionId) + '">เปิดทันที</button>' : '<button class="btn sm" type="button" data-st="CLOSE" data-sid="' + esc(r.sessionId) + '">ปิดรอบ</button>')) +
         (r.scoreMode !== 'NONE' && r.sync.state === 'ERR' ? '<button class="btn sm" type="button" data-sync="' + esc(r.sessionId) + '">ส่งคะแนนใหม่</button>' : '') + '</div></div>';
-    }).join('') + '</div>';
+    }).join('');
   }
 
   function quizzesHtml() {
     if (!quizzes.length) return '<div class="card stack-s" id="emptyZ"><h3>ยังไม่มีแบบทดสอบ</h3><p class="small muted">กด “สร้างแบบทดสอบ” แล้วเพิ่มข้อสอบทีละข้อ หรือนำเข้าจากไฟล์ CSV</p></div>';
-    return '<div class="stack" id="zlist">' + quizzes.map(function (z) {
-      return '<div class="card stack-s" data-quiz="' + esc(z.quizId) + '"><div class="row sp"><h3>' + esc(z.title) + '</h3><span class="pill ' + (z.questionCount ? 'good' : 'warn') + '">' + z.questionCount + ' ข้อ</span></div>' +
+    return '<div id="lkBar"></div><div class="stack" id="zlist"></div>';
+  }
+  function quizItems() {
+    var vis = kitZ.view(quizzes);
+    kitZ.update(vis, quizzes.length);
+    if (!vis.length) return '<div class="callout">ไม่พบแบบทดสอบที่ตรงกับ “' + esc(kitZ.st.q) + '”</div>';
+    return vis.map(function (z) {
+      return '<div class="card stack-s' + (kitZ.st.sel[z.quizId] ? ' lk-on' : '') + '" data-quiz="' + esc(z.quizId) + '"><div class="row sp"><div class="row">' + kitZ.cb(z, z.title) + '<h3>' + esc(z.title) + '</h3></div><span class="pill ' + (z.questionCount ? 'good' : 'warn') + '">' + z.questionCount + ' ข้อ</span></div>' +
         (z.note ? '<p class="small muted">' + esc(z.note) + '</p>' : '') +
         '<p class="small muted">ใช้ในรอบ ' + z.rounds + ' รอบ</p>' +
         '<div class="row"><a class="btn primary sm" href="' + root + 't/exam-questions.html?z=' + encodeURIComponent(z.quizId) + '&id=' + q + '">จัดการข้อสอบ</a>' +
         '<button class="btn sm ghost" type="button" data-zedit="' + esc(z.quizId) + '">เปลี่ยนชื่อ</button><button class="btn sm ghost" type="button" data-zdel="' + esc(z.quizId) + '">ลบ</button></div></div>';
-    }).join('') + '</div>';
+    }).join('');
+  }
+
+  /* ผูกปุ่มในรายการ (วาดซ้ำได้เมื่อค้นหา/เรียง/เลือก) */
+  function bindItems() {
+    HBT.$('[data-msg]').forEach(function (b) { b.addEventListener('click', function () { openMsg(b.getAttribute('data-msg')); }); });
+    HBT.$('[data-st]').forEach(function (b) { b.addEventListener('click', function () { setStatus(b); }); });
+    HBT.$('[data-sync]').forEach(function (b) { b.addEventListener('click', function () { resync(b); }); });
+    HBT.$('[data-zedit]').forEach(function (b) { b.addEventListener('click', function () { openQuiz(b.getAttribute('data-zedit')); }); });
+    HBT.$('[data-zdel]').forEach(function (b) { b.addEventListener('click', function () { delQuiz(b); }); });
+  }
+  function mountKit() {
+    var bar = $('#lkBar'); if (!bar) return;
+    var k = tab === 'rounds' ? kitR : kitZ, box = tab === 'rounds' ? $('#list') : $('#zlist'), items = tab === 'rounds' ? roundItems : quizItems;
+    function paint() { box.innerHTML = items(); bindItems(); }
+    k.mount(bar, paint); k.bindList(box); paint();
+  }
+
+  /* ---------- ลบหลายรายการ ---------- */
+  function sumFail(r, noun) {
+    if (!r.failed.length) { HBT.toast('ลบแล้ว ' + r.ok + ' ' + noun, 'good'); return; }
+    HBT.toast('ลบแล้ว ' + r.ok + ' · ลบไม่ได้ ' + r.failed.length + ' ' + noun + ' (' + HBT.errMsg(r.failed[0].err) + ')', 'bad');
+  }
+  function bulkDelRounds(ids) {
+    var sel = rounds.filter(function (r) { return ids.indexOf(r.sessionId) >= 0; }); if (!sel.length) return;
+    var att = sel.reduce(function (n, r) { return n + (Number(r.attempts) || 0); }, 0);
+    if (!window.confirm('ลบ ' + sel.length + ' รอบที่เลือก?\n' + sel.slice(0, 6).map(function (r) { return '• ' + r.title; }).join('\n') + (sel.length > 6 ? '\n…และอีก ' + (sel.length - 6) + ' รอบ' : '') +
+      '\n\nผลสอบ ' + att + ' ฉบับจะหายถาวร · ลิงก์ของนักศึกษาจะใช้ไม่ได้ · คะแนนที่ซิงก์เข้ารายวิชาจะถูกเอาออก')) return;
+    HBT.listKit.batch(ids, function (sid) { return HBT.api.call('exam.round.delete', { sessionId: sid }, { api: 'exam', write: true }); }).then(function (r) {
+      kitR.clear(); sumFail(r, 'รอบ'); return load();
+    });
+  }
+  function bulkDelQuizzes(ids) {
+    var sel = quizzes.filter(function (z) { return ids.indexOf(z.quizId) >= 0; }); if (!sel.length) return;
+    var used = sel.filter(function (z) { return z.rounds; });
+    var go = sel.filter(function (z) { return !z.rounds; });
+    if (!go.length) { HBT.toast('ลบไม่ได้ — ทุกชุดที่เลือกมีรอบใช้อยู่ (ลบรอบก่อน)', 'bad'); return; }
+    var qn = go.reduce(function (n, z) { return n + (Number(z.questionCount) || 0); }, 0);
+    if (!window.confirm('ลบแบบทดสอบ ' + go.length + ' ชุด พร้อมข้อสอบรวม ' + qn + ' ข้อ?' + (used.length ? '\n(ข้าม ' + used.length + ' ชุดที่มีรอบใช้อยู่)' : '') + '\nลบแล้วกู้คืนไม่ได้')) return;
+    HBT.listKit.batch(go.map(function (z) { return z.quizId; }), function (zid) { return HBT.api.call('exam.quiz.delete', { quizId: zid }, { api: 'exam', write: true }); }).then(function (r) {
+      kitZ.clear(); sumFail(r, 'ชุด'); return load();
+    });
   }
 
   /* ---------- แบบทดสอบ ---------- */
@@ -227,7 +302,7 @@ HBT.page({ active: 'exam', need: 'exam', crumbs: [['รายวิชาขอ�
 
   function load() {
     return Promise.all([HBT.api.call('exam.quiz.list', { courseId: id }, X), HBT.api.call('exam.round.list', { courseId: id }, X)]).then(function (r) {
-      course = r[0].course; quizzes = r[0].quizzes; rounds = r[1].rounds; render();
+      course = r[0].course; quizzes = r[0].quizzes; rounds = r[1].rounds; kitR.prune(rounds); kitZ.prune(quizzes); render();
     }, function (e) {
       var nf = e.code === 'E_NOT_FOUND' || e.code === 'E_FORBIDDEN';
       $('#box').innerHTML = '<div class="callout bad"><b>' + (nf ? 'ไม่พบรายวิชานี้ หรือไม่มีสิทธิ์เข้าถึง' : 'โหลดไม่สำเร็จ') + '</b><br>' + esc(HBT.errMsg(e)) + '</div>' +

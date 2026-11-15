@@ -16,7 +16,7 @@
 
 var Attendance = (function () {
 
-  var SCORE = { normal: 1, late: 0.5, leave: 0 };      // คะแนนเข้าเรียน: ปกติ 1 · สาย 0.5 · ลา/ขาด 0
+  var SCORE = { normal: 1, late: 0.5, absent: 0 };     // ค่าเดิมของคาบที่ไม่ได้บันทึกคะแนนไว้: ปกติ 1 · สาย 0.5 · ลา/ขาด 0
   var STATUSES = ['normal', 'late', 'leave'];
   var APPROVE_WAIT_MIN = 2;        // คำขออนุมัติรอได้กี่นาที
   var APPROVE_VALID_MIN = 5;       // อนุมัติแล้วใช้ได้กี่นาที
@@ -53,9 +53,24 @@ var Attendance = (function () {
     };
   }
 
+  /** คะแนนต่อคาบ {normal, late, absent} (ลา = ขาด) · ว่าง = ค่าเดิม 1 / 0.5 / 0 */
+  function pts_(s) {
+    function v(x, d) { var n = (x === '' || x === undefined || x === null) ? NaN : Number(x); return isFinite(n) ? n : d; }
+    return { normal: v(s.score_normal, SCORE.normal), late: v(s.score_late, SCORE.late), absent: v(s.score_absent, SCORE.absent) };
+  }
+  function ptsOf_(s, status) { var p = pts_(s); return status === 'normal' ? p.normal : status === 'late' ? p.late : p.absent; }
+  /** รับคะแนนจากอาจารย์ (ว่าง = ค่าเริ่มต้นจากตั้งค่าระบบ) · ต้อง 0 ≤ ขาด ≤ สาย ≤ ปกติ ≤ 10 และ ปกติ > 0 */
+  function readPts_(a) {
+    function pick(v, key) { return (v === undefined || v === null || v === '') ? Number(Settings.get(key)) : num_(v); }
+    var n = pick(a.scoreNormal, 'att_score_normal'), l = pick(a.scoreLate, 'att_score_late'), x = pick(a.scoreAbsent, 'att_score_absent');
+    if (isNaN(n) || isNaN(l) || isNaN(x) || n <= 0 || n > 10 || x < 0 || l < x || n < l) throw U.E('E_ATT_SCORE');
+    return { normal: r2_(n), late: r2_(l), absent: r2_(x) };
+  }
+
   function sessionOut_(s, full) {
     var ph = phase_(s, Date.now());
     var o = {
+      scoreNormal: pts_(s).normal, scoreLate: pts_(s).late, scoreAbsent: pts_(s).absent,
       sessionId: s.session_id, courseId: s.course_id, date: s.date, kind: s.kind, status: s.status,
       openedAt: s.opened_at, closedAt: s.closed_at, hasLocation: s.lat !== '' && s.lng !== '',
       startAt: s.start_at, normalMin: s.normal_min === '' ? null : Number(s.normal_min), closeMin: s.close_min === '' ? null : Number(s.close_min),
@@ -104,9 +119,9 @@ var Attendance = (function () {
     var type = Scores.ensureType(courseId, 'ATT', 'ATT', { name: 'เช็คชื่อ', max: 100 });
     var rows = Students.roster(courseId).map(function (st) {
       if (!t.sessions.length) return { stdId: st.std_id, score: '' };
-      var raw = 0;
-      t.sessions.forEach(function (s) { raw += SCORE[statusIn_(t.lookup, s.session_id, st.std_id)] || 0; });
-      return { stdId: st.std_id, score: r2_(raw / t.sessions.length * 100) };
+      var raw = 0, full = 0;       // รวมคะแนนที่ได้ ÷ รวมคะแนนเต็มของทุกคาบที่ปิดแล้ว
+      t.sessions.forEach(function (s) { raw += ptsOf_(s, statusIn_(t.lookup, s.session_id, st.std_id)); full += pts_(s).normal; });
+      return { stdId: st.std_id, score: full ? r2_(raw / full * 100) : 0 };
     });
     if (rows.length) Scores.setRecords(courseId, type.type_id, rows, 'attendance');
   }
@@ -131,6 +146,11 @@ var Attendance = (function () {
     });
   }
 
+  /** ปิดคาบของวิชาที่เลยเวลา "สาย" แล้ว (หลังหมดเวลาสาย = ปิดเช็คชื่ออัตโนมัติ · คะแนนเข้าเรียนคำนวณใหม่) — เรียกทุกครั้งที่มีคนเปิดดูคาบ/ประวัติ/คะแนน */
+  function sweep_(courseId) {
+    sessionsOf_(courseId).forEach(function (s) { if (s.status === 'open') lazyClose_(s); });
+  }
+
   function num_(v) { var n = (typeof v === 'string' && v.trim() === '') ? NaN : Number(v); return n; }
 
   function open(user, a) {
@@ -150,6 +170,7 @@ var Attendance = (function () {
       radius = (a.radiusM === undefined || a.radiusM === null || a.radiusM === '') ? Number(Settings.get('att_radius_m')) : num_(a.radiusM);
       if (isNaN(radius) || radius < 10 || radius > 5000 || Math.floor(radius) !== radius) throw U.E('E_ATT_LOC', { field: 'radius' }, 'รัศมีต้องเป็นจำนวนเต็ม 10–5,000 เมตร');
     }
+    var sc = readPts_(a);
     var normal = (a.normalMin === undefined || a.normalMin === null || a.normalMin === '') ? Number(Settings.get('att_normal_min')) : num_(a.normalMin);
     var close = (a.closeMin === undefined || a.closeMin === null || a.closeMin === '') ? Number(Settings.get('att_close_min')) : num_(a.closeMin);
     if (isNaN(normal) || isNaN(close) || normal < 0 || close <= normal || close > 600) throw U.E('E_ATT_TIME');
@@ -165,10 +186,11 @@ var Attendance = (function () {
     Db.insert('AttSessions', {
       session_id: id, course_id: c.course_id, date: startAt.substring(0, 10), kind: 'live', status: 'open',
       opened_at: U.nowIso(), closed_at: '', lat: lat, lng: lng, radius_m: radius, start_at: startAt,
-      normal_min: normal, close_min: close, paused_at: '', pause_offset_min: 0, created_by: user.email
+      normal_min: normal, close_min: close, paused_at: '', pause_offset_min: 0, created_by: user.email,
+      score_normal: sc.normal, score_late: sc.late, score_absent: sc.absent
     });
     Courses.touch(c.course_id);
-    Audit.log(user.email, 'att.open', id, { course: c.course_id, loc: hasLat, normal: normal, close: close });
+    Audit.log(user.email, 'att.open', id, { course: c.course_id, loc: hasLat, normal: normal, close: close, score: sc });
     return sessionOut_(Db.byId('AttSessions', id), true);
   }
 
@@ -421,6 +443,7 @@ var Attendance = (function () {
   /* ---------- ประวัติ / รายงาน ---------- */
   function sessionsList(user, a) {
     var c = Courses.require(user, a.courseId);
+    sweep_(c.course_id);
     var counts = {};
     Db.findRows('AttRecords', 'course_id', c.course_id).forEach(function (r) { counts[r.session_id] = (counts[r.session_id] || 0) + 1; });
     var list = sessionsOf_(c.course_id).map(function (s) {
@@ -431,14 +454,15 @@ var Attendance = (function () {
 
   function report(user, a) {
     var c = Courses.require(user, a.courseId);
+    sweep_(c.course_id);
     var t = tally_(c.course_id), total = t.sessions.length;
     var students = Students.roster(c.course_id).map(function (st) {
-      var cnt = { normal: 0, late: 0, leave: 0, absent: 0 }, raw = 0;
+      var cnt = { normal: 0, late: 0, leave: 0, absent: 0 }, raw = 0, full = 0;
       var recs = t.sessions.map(function (s) {
         var x = statusIn_(t.lookup, s.session_id, st.std_id);
-        cnt[x]++; raw += SCORE[x] || 0; return x;
+        cnt[x]++; raw += ptsOf_(s, x); full += pts_(s).normal; return x;
       });
-      return { stdId: st.std_id, name: st.name, records: recs, counts: cnt, percent: total ? r2_(raw / total * 100) : null };
+      return { stdId: st.std_id, name: st.name, records: recs, counts: cnt, percent: total && full ? r2_(raw / full * 100) : null };
     });
     var type = Db.findRows('ScoreTypes', 'course_id', c.course_id).filter(function (x) { return x.source === 'ATT'; })[0];
     return {
@@ -533,7 +557,8 @@ var Attendance = (function () {
     var sid = newSid_(), now = U.nowIso();
     Db.insert('AttSessions', {
       session_id: sid, course_id: c.course_id, date: date, kind: 'manual', status: 'closed', opened_at: now, closed_at: now,
-      lat: '', lng: '', radius_m: '', start_at: '', normal_min: '', close_min: '', paused_at: '', pause_offset_min: 0, created_by: user.email
+      lat: '', lng: '', radius_m: '', start_at: '', normal_min: '', close_min: '', paused_at: '', pause_offset_min: 0, created_by: user.email,
+      score_normal: SCORE.normal, score_late: SCORE.late, score_absent: SCORE.absent        // นำเข้า = ใช้ 1 / 0.5 / 0 เสมอ (ไม่ขึ้นกับค่าตั้งค่าที่เปลี่ยนภายหลัง)
     });
     Db.insertMany('AttRecords', good.filter(function (g) { return g.status !== 'absent'; }).map(function (g) {
       return { rec_key: rk_(sid, g.stdId), session_id: sid, course_id: c.course_id, std_id: g.stdId, at: now, status: g.status, lat: '', lng: '', device_id: '', note: g.status === 'leave' ? 'ลา' : '', source: 'IMPORT' };
@@ -591,6 +616,6 @@ var Attendance = (function () {
     sessionsList: sessionsList, report: report, studentDetail: studentDetail, exportCsv: exportCsv,
     setStatus: setStatus, importRows: importRows, deleteSession: deleteSession, deleteEmpty: deleteEmpty,
     forgetDevices: forgetDevices, countForStudent: countForStudent, removeForStudents: removeForStudents,
-    syncScores: syncScores_, phase: phase_
+    syncScores: syncScores_, sweep: sweep_, phase: phase_
   };
 })();

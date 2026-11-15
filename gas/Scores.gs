@@ -152,6 +152,7 @@ var Scores = (function () {
 
   function table(user, courseId) {
     var c = Courses.require(user, courseId);
+    Attendance.sweep(c.course_id);               // คาบที่หมดเวลาสายแล้วปิดและคิดคะแนนก่อนแสดงตาราง
     var types = typesOf_(c.course_id);
     var rec = recordsOf_(c.course_id);
     var students = Students.roster(c.course_id).map(function (s) {

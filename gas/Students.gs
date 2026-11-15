@@ -187,6 +187,41 @@ var Students = (function () {
     return { deleted: deleted };
   }
 
+  /** รับรายการรหัสหลายตัว (1–MAX_IMPORT) → รหัสที่อยู่ในวิชานี้จริง (ไม่ซ้ำ) · ไม่มีเลย = E_NOT_FOUND */
+  function pickMany_(courseId, ids) {
+    if (!Array.isArray(ids) || !ids.length) throw U.E('E_BAD_REQUEST', null, 'ยังไม่ได้เลือกนักศึกษา');
+    if (ids.length > MAX_IMPORT) throw U.E('E_BAD_REQUEST', { max: MAX_IMPORT }, 'เลือกได้ครั้งละไม่เกิน ' + MAX_IMPORT + ' คน');
+    var seen = {}, out = [];
+    ids.forEach(function (raw) {
+      var id; try { id = cleanId_(raw); } catch (e) { return; }
+      if (!seen[id] && Db.byId('Students', key_(courseId, id))) { seen[id] = true; out.push(id); }
+    });
+    if (!out.length) throw U.E('E_NOT_FOUND');
+    return out;
+  }
+
+  /** ภาพรวมก่อนลบหลายคน: จำนวนข้อมูลที่จะหายรวมกัน (ผลสอบนับเฉพาะเมื่อเลือกไม่เกิน 10 คน — เรียกระบบสอบทีละคนช้า) */
+  function impactMany(user, a) {
+    var c = Courses.require(user, a.courseId);
+    var ids = pickMany_(c.course_id, a.stdIds);
+    var items = STUDENT_CASCADE.map(function (p) {
+      if (p.key === 'exam' && ids.length > 10) return { key: p.key, label: p.label, count: null };
+      var n = 0; ids.forEach(function (id) { n += Number(p.count(c.course_id, id)) || 0; });
+      return { key: p.key, label: p.label, count: n };
+    });
+    return { count: ids.length, items: items };
+  }
+
+  /** ลบนักศึกษาหลายคนพร้อมข้อมูลที่ผูกอยู่ในวิชานี้ (ถาวร · ไม่แตะ PIN) */
+  function removeMany(user, a) {
+    var c = Courses.require(user, a.courseId);
+    var ids = pickMany_(c.course_id, a.stdIds);
+    var deleted = removeStudents_(c.course_id, ids);
+    Courses.touch(c.course_id);
+    Audit.log(user.email, 'student.removeMany', c.course_id, { count: ids.length, deleted: deleted });
+    return { removed: ids.length, deleted: deleted };
+  }
+
   /** ใช้โดยโมดูลอื่น: นักศึกษาอยู่ในวิชานี้ไหม (คืนแถวหรือ null) */
   function find(courseId, stdId) { return Db.byId('Students', key_(courseId, String(stdId).toUpperCase())); }
 
@@ -199,7 +234,7 @@ var Students = (function () {
   }
 
   return {
-    list: list, add: add, update: update, importCsv: importCsv, impact: impact, remove: remove,
+    list: list, add: add, update: update, importCsv: importCsv, impact: impact, remove: remove, impactMany: impactMany, removeMany: removeMany, pickMany: pickMany_,
     find: find, roster: rosterOf_, pubList: pubList, cleanId: cleanId_
   };
 })();

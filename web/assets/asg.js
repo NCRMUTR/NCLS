@@ -44,6 +44,53 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
   }
   function phasePill(p) { return p === 'closed' ? '<span class="pill bad">ปิดรับ</span>' : p === 'late' ? '<span class="pill warn">เลยกำหนด · รับช้า</span>' : '<span class="pill good">เปิดรับ</span>'; }
 
+  var kit = HBT.listKit({
+    id: function (a) { return a.asgId; },
+    search: function (a) { return a.title + ' ' + a.code + ' ' + (a.kind === 'group' ? 'กลุ่ม' : 'เดี่ยว'); },
+    sorts: [
+      { k: 'created', label: 'ล่าสุดที่สั่ง', fn: function (a) { return a.createdAt || ''; } },
+      { k: 'title', label: 'ชื่องาน', fn: function (a) { return a.title; } },
+      { k: 'due', label: 'กำหนดส่ง', fn: function (a) { return a.dueAt || '9999'; } },
+      { k: 'submitted', label: 'จำนวนที่ส่งแล้ว', fn: function (a) { return Number(a.stats.submitted) || 0; } },
+      { k: 'togra', label: 'จำนวนรอตรวจ', fn: function (a) { return Number(a.stats.toGrade) || 0; } }
+    ],
+    sort: 'created', dir: -1, noun: 'งาน',
+    bulk: [{ label: 'ลบงานที่เลือก', cls: 'danger', run: function (ids) { bulkDelete(ids); } }]
+  });
+
+  function items() {
+    var vis = kit.view(data.assignments);
+    kit.update(vis, data.assignments.length);
+    if (!vis.length) return '<div class="callout">ไม่พบงานที่ตรงกับ “' + esc(kit.st.q) + '”</div>';
+    return vis.map(function (a) {
+      var s = a.stats;
+      return '<div class="card stack-s' + (kit.st.sel[a.asgId] ? ' lk-on' : '') + '" data-asg="' + esc(a.asgId) + '"><div class="row sp"><div class="row">' + kit.cb(a, a.title) + '<h3>' + esc(a.title) + '</h3></div><div class="row"><span class="pill ' + (a.kind === 'group' ? 'info' : 'acc') + '">' + (a.kind === 'group' ? 'กลุ่ม' : 'เดี่ยว') + '</span>' + phasePill(a.phase) + '</div></div>' +
+        '<p class="small muted">รหัสงาน <b class="mono">' + esc(a.code) + '</b> · เต็ม ' + esc(a.maxScore) + ' · สัดส่วน ' + esc(a.pct) + '%' + (a.requireFile ? ' · ต้องแนบไฟล์' : ' · ไม่บังคับแนบไฟล์') + (a.dueAt ? ' · กำหนดส่ง ' + esc(fmt(a.dueAt)) : ' · ไม่กำหนดวันส่ง') + (a.closeAt ? ' · ปิดรับ ' + esc(fmt(a.closeAt)) : '') + '</p>' +
+        '<div class="row small"><span class="pill ' + (s.submitted ? 'good' : '') + '">ส่งแล้ว ' + s.submitted + ' / ' + s.total + (a.kind === 'group' ? ' กลุ่ม' : '') + '</span>' +
+        (s.toGrade ? '<span class="pill warn">รอตรวจ ' + s.toGrade + '</span>' : '') + (s.graded ? '<span class="pill info">ตรวจแล้ว ' + s.graded + '</span>' : '') +
+        (s.late ? '<span class="pill warn">ส่งช้า ' + s.late + '</span>' : '') + (a.kind === 'group' && s.ungrouped ? '<span class="pill">ยังไม่มีกลุ่ม ' + s.ungrouped + ' คน</span>' : '') + '</div>' +
+        '<div class="row"><a class="btn primary sm" href="' + root + 't/asg-detail.html?a=' + encodeURIComponent(a.asgId) + '">ตรวจงาน</a>' +
+        '<button class="btn sm" type="button" data-msg="' + esc(a.asgId) + '">แจ้งนักศึกษา</button><button class="btn sm ghost" type="button" data-edit="' + esc(a.asgId) + '">แก้ไข</button></div></div>';
+    }).join('');
+  }
+  function paintItems() {
+    var box = $('#list'); if (!box) return;
+    box.innerHTML = items();
+    HBT.$('[data-edit]', box).forEach(function (b) { b.addEventListener('click', function () { openEdit(b.getAttribute('data-edit')); }); });
+    HBT.$('[data-msg]', box).forEach(function (b) { b.addEventListener('click', function () { openMsg(b.getAttribute('data-msg')); }); });
+  }
+  function bulkDelete(ids) {
+    var sel = data.assignments.filter(function (a) { return ids.indexOf(a.asgId) >= 0; }); if (!sel.length) return;
+    var subs = sel.reduce(function (n, a) { return n + (Number(a.stats.submitted) || 0); }, 0);
+    if (!window.confirm('ลบงาน ' + sel.length + ' งานที่เลือก?\n' + sel.slice(0, 6).map(function (a) { return '• ' + a.title; }).join('\n') + (sel.length > 6 ? '\n…และอีก ' + (sel.length - 6) + ' งาน' : '') +
+      '\n\nงานที่นักศึกษาส่งแล้วรวม ' + subs + ' รายการ พร้อมไฟล์ใน Drive และคะแนนของงานเหล่านี้จะหายถาวร กู้คืนไม่ได้')) return;
+    HBT.listKit.batch(ids, function (aid) { return HBT.api.call('asg.delete', { asgId: aid }, { write: true }); }).then(function (r) {
+      kit.clear();
+      HBT.toast(r.failed.length ? 'ลบแล้ว ' + r.ok + ' · ลบไม่ได้ ' + r.failed.length + ' งาน (' + HBT.errMsg(r.failed[0].err) + ')' : 'ลบแล้ว ' + r.ok + ' งาน', r.failed.length ? 'bad' : 'good');
+      return load();
+    });
+  }
+
   function render() {
     var c = course;
     document.title = 'ส่งงาน ' + c.code + ' — HBT Learning System';
@@ -55,21 +102,12 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
     if (!data.assignments.length) {
       h += '<div class="card stack-s" id="empty"><h3>ยังไม่มีงาน</h3><p class="small muted">กด “สั่งงานใหม่” เพื่อสร้างงานเดี่ยวหรืองานกลุ่ม ระบบจะออกรหัสงานให้</p></div>';
     } else {
-      h += '<div class="stack" id="list">' + data.assignments.map(function (a) {
-        var s = a.stats;
-        return '<div class="card stack-s" data-asg="' + esc(a.asgId) + '"><div class="row sp"><h3>' + esc(a.title) + '</h3><div class="row"><span class="pill ' + (a.kind === 'group' ? 'info' : 'acc') + '">' + (a.kind === 'group' ? 'กลุ่ม' : 'เดี่ยว') + '</span>' + phasePill(a.phase) + '</div></div>' +
-          '<p class="small muted">รหัสงาน <b class="mono">' + esc(a.code) + '</b> · เต็ม ' + esc(a.maxScore) + ' · สัดส่วน ' + esc(a.pct) + '%' + (a.requireFile ? ' · ต้องแนบไฟล์' : ' · ไม่บังคับแนบไฟล์') + (a.dueAt ? ' · กำหนดส่ง ' + esc(fmt(a.dueAt)) : ' · ไม่กำหนดวันส่ง') + (a.closeAt ? ' · ปิดรับ ' + esc(fmt(a.closeAt)) : '') + '</p>' +
-          '<div class="row small"><span class="pill ' + (s.submitted ? 'good' : '') + '">ส่งแล้ว ' + s.submitted + ' / ' + s.total + (a.kind === 'group' ? ' กลุ่ม' : '') + '</span>' +
-          (s.toGrade ? '<span class="pill warn">รอตรวจ ' + s.toGrade + '</span>' : '') + (s.graded ? '<span class="pill info">ตรวจแล้ว ' + s.graded + '</span>' : '') +
-          (s.late ? '<span class="pill warn">ส่งช้า ' + s.late + '</span>' : '') + (a.kind === 'group' && s.ungrouped ? '<span class="pill">ยังไม่มีกลุ่ม ' + s.ungrouped + ' คน</span>' : '') + '</div>' +
-          '<div class="row"><a class="btn primary sm" href="' + root + 't/asg-detail.html?a=' + encodeURIComponent(a.asgId) + '">ตรวจงาน</a>' +
-          '<button class="btn sm" type="button" data-msg="' + esc(a.asgId) + '">แจ้งนักศึกษา</button><button class="btn sm ghost" type="button" data-edit="' + esc(a.asgId) + '">แก้ไข</button></div></div>';
-      }).join('') + '</div>';
+      h += '<div id="lkBar"></div><div class="stack" id="list"></div>';
     }
     $('#box').innerHTML = h;
     $('#newBtn').addEventListener('click', function () { openEdit(null); });
-    HBT.$$('[data-edit]').forEach(function (b) { b.addEventListener('click', function () { openEdit(b.getAttribute('data-edit')); }); });
-    HBT.$$('[data-msg]').forEach(function (b) { b.addEventListener('click', function () { openMsg(b.getAttribute('data-msg')); }); });
+    var bar = $('#lkBar');
+    if (bar) { kit.mount(bar, paintItems); kit.bindList($('#list')); paintItems(); }
   }
 
   function find(aid) { return data.assignments.filter(function (a) { return a.asgId === aid; })[0]; }
@@ -125,7 +163,7 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
 
   function load() {
     return Promise.all([HBT.api.call('asg.list', { courseId: id }), HBT.api.call('course.get', { courseId: id })]).then(function (r) {
-      data = r[0]; course = r[1]; render();
+      data = r[0]; course = r[1]; kit.prune(data.assignments); render();
       var ed = HBT.qs('edit'); if (ed && find(ed)) { openEdit(ed); }
     }, function (e) {
       var nf = e.code === 'E_NOT_FOUND' || e.code === 'E_FORBIDDEN';

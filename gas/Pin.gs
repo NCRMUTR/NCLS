@@ -215,6 +215,9 @@ var Pin = (function () {
     if (U.bool(a.all)) {
       var st = statuses(course.course_id, roster.map(function (s) { return s.std_id; }));
       targets = roster.filter(function (s) { return st[s.std_id] === 'none'; });
+    } else if (Array.isArray(a.stdIds)) {             // หลายคนที่เลือก (รีเซ็ต PIN ที่มีอยู่ทิ้งเหมือนรายคน)
+      var pick = {}; Students.pickMany(course.course_id, a.stdIds).forEach(function (i) { pick[i] = true; });
+      targets = roster.filter(function (s) { return pick[s.std_id] === true; });
     } else {
       var id = Students.cleanId(U.req(a.stdId, 'stdId'));
       targets = roster.filter(function (s) { return s.std_id === id; });

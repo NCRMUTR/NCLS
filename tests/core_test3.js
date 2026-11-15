@@ -408,6 +408,41 @@ test('คะแนนเช็คชื่อ = (ปกติ1 สาย0.5 ล�
   assert.strictEqual(ok(s.api(s.T1, 'att.report', { courseId: s.cid })).weightPct, 10);
   assert.strictEqual(scoreOf(s, 1).ty.pct, 10);
 });
+test('คะแนนต่อคาบปรับได้: ค่าเริ่มต้นมาจากตั้งค่าระบบ · ตั้งเองต่อคาบ (ปกติ 2 สาย 1 ขาด 0) · คาบน้ำหนักต่างกันคิดตามคะแนนเต็มของคาบ', () => {
+  const s = world();
+  const o1 = open(s);                                              // ค่าเริ่มต้น 1 / 0.5 / 0
+  assert.deepStrictEqual([o1.scoreNormal, o1.scoreLate, o1.scoreAbsent], [1, 0.5, 0]);
+  first(s, o1.sessionId, 1, 1); ok(s.api(s.T1, 'att.close', { sessionId: o1.sessionId }));
+  const o2 = open(s, { scoreNormal: 2, scoreLate: 1, scoreAbsent: 0 }); s.advance(12);
+  assert.deepStrictEqual([o2.scoreNormal, o2.scoreLate, o2.scoreAbsent], [2, 1, 0]);
+  ci(s, o2.sessionId, 1, 1);                                       // สาย = 1 จาก 2
+  ok(s.api(s.T1, 'att.close', { sessionId: o2.sessionId }));
+  assert.strictEqual(scoreOf(s, 1).v, 66.67);                      // (1 + 1) ÷ (1 + 2) × 100
+  assert.strictEqual(scoreOf(s, 2).v, 0);
+  ok(s.api(s.A, 'settings.set', { changes: { att_score_late: '0.75', att_score_normal: '3' } }));
+  const o3 = open(s); assert.deepStrictEqual([o3.scoreNormal, o3.scoreLate, o3.scoreAbsent], [3, 0.75, 0]);
+});
+test('คะแนนต่อคาบ: ต้อง ปกติ ≥ สาย ≥ ขาด ≥ 0 และปกติ > 0 ไม่เกิน 10 · ผิด = E_ATT_SCORE ไม่เขียนแถว · ลา = นับเท่าขาด', () => {
+  const s = world();
+  [{ scoreNormal: 1, scoreLate: 2 }, { scoreNormal: 0 }, { scoreNormal: 11 }, { scoreAbsent: -1 }, { scoreNormal: 1, scoreLate: 0.5, scoreAbsent: 0.8 }, { scoreNormal: 'x' }].forEach(b =>
+    assert.strictEqual(code(s.api(s.T1, 'att.open', Object.assign({ courseId: s.cid }, b))), 'E_ATT_SCORE', JSON.stringify(b)));
+  assert.strictEqual(sess(s).length, 0);
+  const o = open(s, { scoreNormal: 1, scoreLate: 0.5, scoreAbsent: 0.25 });
+  first(s, o.sessionId, 1, 1);
+  ok(s.api(s.T1, 'att.setStatus', { sessionId: o.sessionId, stdId: std(3), status: 'leave' }));
+  ok(s.api(s.T1, 'att.close', { sessionId: o.sessionId }));
+  assert.strictEqual(scoreOf(s, 1).v, 100); assert.strictEqual(scoreOf(s, 3).v, 25); assert.strictEqual(scoreOf(s, 4).v, 25);
+});
+test('หมดเวลาสาย = ปิดคาบอัตโนมัติ: ไม่ต้องมีใครกดปิด (เปิดดูประวัติ/คะแนน/รายงานแล้วคาบปิดและคิดคะแนน) · เช็คชื่อหลังหมดเวลา E_ATT_CLOSED', () => {
+  const s = world();
+  const o = open(s, { normalMin: 5, closeMin: 15 }); first(s, o.sessionId, 1, 1);
+  s.advance(16);
+  assert.strictEqual(ok(s.api(s.T1, 'att.sessions', { courseId: s.cid })).sessions[0].status, 'closed');
+  assert.strictEqual(scoreOf(s, 1).v, 100);
+  assert.strictEqual(code(ci(s, o.sessionId, 2, 2, { newPin: '1234' })), 'E_ATT_CLOSED');
+  const o2 = open(s, { normalMin: 5, closeMin: 15 }); first(s, o2.sessionId, 2, 2); s.advance(16);
+  assert.strictEqual(ok(s.api(s.T1, 'att.report', { courseId: s.cid })).totalSessions, 2);       // รายงานก็ปิดให้
+});
 test('แก้สถานะ/ลบคาบ/นำเข้า/ลบนักศึกษา แล้วคะแนนเช็คชื่อตามมา', () => {
   const s = world();
   const o = open(s); first(s, o.sessionId, 1, 1); ok(s.api(s.T1, 'att.close', { sessionId: o.sessionId }));

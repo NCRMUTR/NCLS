@@ -199,6 +199,34 @@ test('ลบนักศึกษาที่ไม่มีแถวรหั�
   assert.strictEqual(ok(s.api(s.T1, 'student.list', { courseId: b })).students.length, 2);
 });
 
+test('removeMany/impactMany: ลบหลายคนพร้อมข้อมูลที่ผูก · ดูผลก่อนลบ · วิชาอื่น/PIN ไม่หาย · สิทธิ์เจ้าของวิชา · รหัสนอกวิชาถูกข้าม · ว่าง/ไม่มีใครอยู่ในวิชา = ปฏิเสธ', () => {
+  const s = world(); const a = mkCourse(s, s.T1, 'A1'), b = mkCourse(s, s.T1, 'A2'); mkStudents(s, s.T1, a, 5); mkStudents(s, s.T1, b, 5);
+  const ty = ok(s.api(s.T1, 'score.saveType', { courseId: a, name: 'ก', pct: 10, max: 10 })).typeId;
+  ok(s.api(s.T1, 'score.saveBulk', { courseId: a, typeId: ty, rows: [{ stdId: '660001', score: 5 }, { stdId: '660002', score: 6 }, { stdId: '660005', score: 7 }] }));
+  const im = ok(s.api(s.T1, 'student.impactMany', { courseId: a, stdIds: ['660001', '660002', '660003', '660001', '999999'] }));
+  assert.strictEqual(im.count, 3); assert.strictEqual(im.items.find(x => x.key === 'scores').count, 2);
+  assert.strictEqual(s.rows('Students').length, 10);                                  // ดูผลเฉย ๆ ไม่ลบ
+  assert.strictEqual(code(s.api(s.T2, 'student.removeMany', { courseId: a, stdIds: ['660001'] })), 'E_FORBIDDEN');
+  assert.strictEqual(code(s.api(s.T1, 'student.removeMany', { courseId: a, stdIds: [] })), 'E_BAD_REQUEST');
+  assert.strictEqual(code(s.api(s.T1, 'student.removeMany', { courseId: a, stdIds: ['999999', 'x'] })), 'E_NOT_FOUND');
+  assert.strictEqual(code(s.api(s.T1, 'student.removeMany', { courseId: a, stdIds: 'all' })), 'E_BAD_REQUEST');
+  const r = ok(s.api(s.T1, 'student.removeMany', { courseId: a, stdIds: ['660001', '660002', '660003', '999999'] }));
+  assert.strictEqual(r.removed, 3);
+  assert.deepStrictEqual(ok(s.api(s.T1, 'student.list', { courseId: a })).students.map(x => x.stdId), ['660004', '660005']);
+  assert.strictEqual(ok(s.api(s.T1, 'student.list', { courseId: b })).students.length, 5);   // วิชาอื่นไม่หาย
+  assert.strictEqual(s.rows('ScoreRecords').length, 1);                                // เหลือของ 660005
+  assert.ok(s.rows('AuditLog').some(x => x[3] === 'student.removeMany'));
+});
+test('issueTemp stdIds: ออกรหัสให้เฉพาะที่เลือกหลายคน (รีเซ็ตคนที่มี PIN) · รหัสนอกวิชาถูกข้าม · ไม่เลือกเลย = ปฏิเสธ', () => {
+  const s = world(); const id = mkCourse(s, s.T1); mkStudents(s, s.T1, id, 4);
+  const r = ok(s.api(s.T1, 'pin.issueTemp', { courseId: id, stdIds: ['660001', '660003', '999999'] }));
+  assert.deepStrictEqual(r.codes.map(c => c.stdId).sort(), ['660001', '660003']);
+  const l = ok(s.api(s.T1, 'student.list', { courseId: id })).students.map(x => x.pinStatus);
+  assert.deepStrictEqual(l, ['temp', 'none', 'temp', 'none']);
+  assert.strictEqual(code(s.api(s.T1, 'pin.issueTemp', { courseId: id, stdIds: [] })), 'E_BAD_REQUEST');
+  assert.strictEqual(code(s.api(s.T2, 'pin.issueTemp', { courseId: id, stdIds: ['660001'] })), 'E_FORBIDDEN');
+});
+
 /* ============================================================ */
 group('PIN');
 function pinWorld() {

@@ -127,6 +127,14 @@ var ROUTES = {
     auth: 'user', write: true,
     fn: function (a, u) { return Students.remove(u, a); }
   },
+  'student.impactMany': {
+    auth: 'user',
+    fn: function (a, u) { return Students.impactMany(u, a); }
+  },
+  'student.removeMany': {
+    auth: 'user', write: true,
+    fn: function (a, u) { return Students.removeMany(u, a); }
+  },
   'pin.issueTemp': {
     auth: 'user', write: true,
     fn: function (a, u) { return Pin.issueTemp(u, a); }

@@ -452,7 +452,8 @@ test('settings.get ครบค่า default', () => {
   assert.strictEqual(m.att_radius_m, '500');
   assert.strictEqual(m.file_types, 'pdf,jpg,png,docx,xlsx,pptx');
   assert.strictEqual(m.att_require_pin, '1');
-  assert.strictEqual(r.length, 9);
+  assert.strictEqual(m.att_score_normal, '1'); assert.strictEqual(m.att_score_late, '0.5'); assert.strictEqual(m.att_score_absent, '0');
+  assert.strictEqual(r.length, 12);
 });
 test('settings.set: บันทึกหลายค่า + มีผลทันทีข้าม execution + audit', () => {
   const s = fresh();

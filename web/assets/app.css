@@ -244,3 +244,11 @@ tr.is-new td{background:var(--accent-soft)}
 #repTbl th.c,#repTbl td.c{padding-left:6px;padding-right:6px}
 .appr{border-color:var(--warn)}
 details>summary{cursor:pointer}
+
+/* listkit: ค้นหา/เรียง/เลือกหลายรายการ */
+.lk-bar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.lk-row{gap:10px}.lk-row .field{margin:0}
+.lk-actions{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.lk-all{white-space:nowrap}
+tr.lk-on td,.card.lk-on{background:var(--accent-soft,var(--surface2))}
+th.lk-w,td.lk-w{width:36px;text-align:center}

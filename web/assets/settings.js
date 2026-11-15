@@ -67,9 +67,9 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
   /* ---------- ค่าตั้งค่า ---------- */
   function field(d) {
     var id = 'st_' + d.key;
-    if (d.type === 'int') {
+    if (d.type === 'int' || d.type === 'num') {
       return '<div class="field"><label for="' + id + '">' + esc(d.label) + '</label>' +
-        '<input id="' + id + '" data-key="' + esc(d.key) + '" type="number" inputmode="numeric" min="' + d.min + '" max="' + d.max + '" step="1" value="' + esc(d.value) + '">' +
+        '<input id="' + id + '" data-key="' + esc(d.key) + '" type="number" inputmode="' + (d.type === 'num' ? 'decimal' : 'numeric') + '" min="' + d.min + '" max="' + d.max + '" step="' + (d.type === 'num' ? '0.05' : '1') + '" value="' + esc(d.value) + '">' +
         '<span class="help">ช่วงที่ใช้ได้ ' + d.min + '–' + d.max + ' · ค่าเริ่มต้น ' + esc(d.def) + '</span></div>';
     }
     if (d.type === 'bool') {
@@ -91,8 +91,8 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
     defs.forEach(function (d) { if (!by[d.group]) { by[d.group] = []; groups.push(d.group); } by[d.group].push(d); });
     $('#setBody').innerHTML = groups.map(function (g) {
       var items = by[g];
-      return '<section class="card stack"><h3>' + esc(g) + '</h3><div class="grid g2">' + items.filter(function (d) { return d.type === 'int'; }).map(field).join('') + '</div>' +
-        items.filter(function (d) { return d.type !== 'int'; }).map(field).join('') + '</section>';
+      return '<section class="card stack"><h3>' + esc(g) + '</h3><div class="grid g2">' + items.filter(function (d) { return d.type === 'int' || d.type === 'num'; }).map(field).join('') + '</div>' +
+        items.filter(function (d) { return d.type !== 'int' && d.type !== 'num'; }).map(field).join('') + '</section>';
     }).join('');
     orig = {};
     defs.forEach(function (d) { orig[d.key] = String(d.value); });
@@ -136,6 +136,9 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
         if (v === '' || !isFinite(n) || Math.floor(n) !== n || n < d.min || n > d.max) {
           $('#setErr').textContent = '“' + d.label + '” ต้องเป็นจำนวนเต็มระหว่าง ' + d.min + ' ถึง ' + d.max; return;
         }
+      } else if (d.type === 'num') {
+        var x = Number(v);
+        if (v === '' || !isFinite(x) || x < d.min || x > d.max) { $('#setErr').textContent = '“' + d.label + '” ต้องเป็นตัวเลขระหว่าง ' + d.min + ' ถึง ' + d.max; return; }
       } else if (d.type === 'list' && !v) {
         $('#setErr').textContent = '“' + d.label + '” ต้องเลือกอย่างน้อย 1 รายการ'; return;
       }
