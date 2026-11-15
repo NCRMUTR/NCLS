@@ -175,7 +175,7 @@ var Scores = (function () {
    * เขียนคะแนนหลายคน (ใช้ทั้งหน้าวางจาก Excel และระบบอื่นที่คำนวณคะแนนเอง)
    * rows: [{stdId, score}] · score ว่าง/null = ล้างคะแนน · ผิดแถวไหน ข้ามแถวนั้นและรายงาน (แถวอื่นยังบันทึก)
    */
-  function writeRecords_(courseId, type, rows, actor) {
+  function writeRecords_(courseId, type, rows, actor, honorLock) {
     if (!Array.isArray(rows) || !rows.length) throw U.E('E_BAD_REQUEST', { why: 'rows' });
     if (rows.length > MAX_ROWS) throw U.E('E_BAD_REQUEST', { why: 'too_many', max: MAX_ROWS });
     var max = Number(type.max_score);
@@ -183,7 +183,7 @@ var Scores = (function () {
     Db.findRows('ScoreRecords', 'type_id', type.type_id).forEach(function (r) { existing[r.std_id] = r; });
     var roster = {};
     Students.roster(courseId).forEach(function (s) { roster[s.std_id] = true; });
-    var seen = {}, skipped = [], patch = {}, inserts = [], saved = 0, cleared = 0, same = 0, now = U.nowIso();
+    var seen = {}, skipped = [], patch = {}, inserts = [], saved = 0, cleared = 0, same = 0, kept = 0, now = U.nowIso();
 
     rows.forEach(function (r, i) {
       var rowNo = i + 1, id = '';
@@ -192,14 +192,21 @@ var Scores = (function () {
       if (seen[id]) { skipped.push({ row: rowNo, stdId: id, why: 'รหัสซ้ำ (ใช้แถวแรก)' }); return; }
       seen[id] = true;
       var ex = existing[id];
-      if (isBlank_(r.score)) {
+      var blank = isBlank_(r.score), v = '';
+      if (!blank) {
+        v = parseNum_(r.score);
+        if (isNaN(v)) { skipped.push({ row: rowNo, stdId: id, why: 'คะแนนไม่ใช่ตัวเลข' }); return; }
+        if (v > max + EPS) { skipped.push({ row: rowNo, stdId: id, why: 'เกินคะแนนเต็ม ' + max }); return; }
+        v = r2_(v);
+      }
+      if (honorLock && ex && U.bool(ex.locked)) {          // อาจารย์ปรับทับไว้ → ไม่แตะคะแนน แค่จำค่าที่ระบบคิดล่าสุด (ไว้เทียบ/คืนค่า)
+        if (String(ex.auto_value) !== String(v)) patch[ex._row] = { auto_value: v };
+        kept++; return;
+      }
+      if (blank) {
         if (ex && ex.score !== '') { patch[ex._row] = { score: '', updated_at: now, updated_by: actor }; cleared++; } else same++;
         return;
       }
-      var v = parseNum_(r.score);
-      if (isNaN(v)) { skipped.push({ row: rowNo, stdId: id, why: 'คะแนนไม่ใช่ตัวเลข' }); return; }
-      if (v > max + EPS) { skipped.push({ row: rowNo, stdId: id, why: 'เกินคะแนนเต็ม ' + max }); return; }
-      v = r2_(v);
       if (ex) {
         if (ex.score !== '' && Number(ex.score) === v) { same++; return; }
         patch[ex._row] = { score: v, updated_at: now, updated_by: actor };
@@ -210,8 +217,8 @@ var Scores = (function () {
     });
     if (Object.keys(patch).length) Db.bulkPatch('ScoreRecords', patch);
     if (inserts.length) Db.insertMany('ScoreRecords', inserts);
-    if (saved || cleared) Courses.touch(courseId);
-    return { saved: saved, cleared: cleared, unchanged: same, skipped: skipped.slice(0, 200), skippedCount: skipped.length };
+    if (saved || cleared || Object.keys(patch).length) Courses.touch(courseId);
+    return { saved: saved, cleared: cleared, unchanged: same, kept: kept, skipped: skipped.slice(0, 200), skippedCount: skipped.length };
   }
 
   function saveBulk(user, a) {
@@ -224,13 +231,183 @@ var Scores = (function () {
     return res;
   }
 
+  /* ============ สรุปคะแนน · ปรับทับ · คะแนนปรับ · เกณฑ์เกรด (v0.10.0) ============ */
+  var GRADE_ORDER = ['A', 'B+', 'B', 'C+', 'C', 'D+', 'D'];
+  var DEFAULT_CUTS = { 'A': 80, 'B+': 75, 'B': 70, 'C+': 65, 'C': 60, 'D+': 55, 'D': 50 };
+
+  function validCuts_(o) {
+    var prev = 101;
+    for (var i = 0; i < GRADE_ORDER.length; i++) {
+      var v = o ? Number(o[GRADE_ORDER[i]]) : NaN;
+      if (!isFinite(v) || v < 0 || v > 100 || v >= prev) return false;
+      prev = v;
+    }
+    return true;
+  }
+  function scaleOf_(courseId) {
+    var r = Db.byId('GradeScale', courseId);
+    if (r && r.cuts) { try { var o = JSON.parse(r.cuts); if (validCuts_(o)) return o; } catch (e) { /* ใช้ค่าเริ่มต้น */ } }
+    return Object.assign({}, DEFAULT_CUTS);
+  }
+  function gradeFor_(total, cuts) {
+    for (var i = 0; i < GRADE_ORDER.length; i++) if (total + EPS >= Number(cuts[GRADE_ORDER[i]])) return GRADE_ORDER[i];
+    return 'F';
+  }
+
+  /** ตั้ง/ดู/คืนค่าเริ่มต้นของเกณฑ์เกรด: a = { courseId, cuts?: {A:80,...} | null(คืนค่าเริ่มต้น) } */
+  function gradeScale(user, a) {
+    var c = Courses.require(user, a.courseId);
+    if (a.cuts !== undefined) {
+      var ex = Db.byId('GradeScale', c.course_id);
+      if (a.cuts === null) { if (ex) Db.remove('GradeScale', c.course_id); }
+      else {
+        var cuts = {};
+        GRADE_ORDER.forEach(function (k) { var v = parseNum_(a.cuts && a.cuts[k]); cuts[k] = isNaN(v) ? NaN : r2_(v); });
+        if (!validCuts_(cuts)) throw U.E('E_SCORE_FIELD', { field: 'cuts' }, 'เกณฑ์เกรดต้องเป็นตัวเลข 0–100 และไล่จากมากไปน้อย (A > B+ > B > C+ > C > D+ > D)');
+        var row = { cuts: JSON.stringify(cuts), updated_at: U.nowIso(), updated_by: user.email };
+        if (ex) Db.update('GradeScale', c.course_id, row); else Db.insert('GradeScale', Object.assign({ course_id: c.course_id }, row));
+      }
+      Courses.touch(c.course_id);
+      Audit.log(user.email, 'score.gradeScale', c.course_id, a.cuts === null ? 'default' : '');
+    }
+    return { cuts: scaleOf_(c.course_id), defaults: DEFAULT_CUTS, order: GRADE_ORDER };
+  }
+
+  /** คะแนนปรับรายคน (+/-) บวกเข้าคะแนนรวม (% ของวิชา) · a = { courseId, rows:[{stdId, points, reason?}] } · points ว่าง/0 = ลบคะแนนปรับ */
+  function adjust(user, a) {
+    var c = Courses.require(user, a.courseId), rows = a.rows;
+    if (!Array.isArray(rows) || !rows.length) throw U.E('E_BAD_REQUEST', { why: 'rows' });
+    if (rows.length > MAX_ROWS) throw U.E('E_BAD_REQUEST', { why: 'too_many', max: MAX_ROWS });
+    var roster = {}, seen = {}, skipped = [], saved = 0, cleared = 0, now = U.nowIso();
+    Students.roster(c.course_id).forEach(function (s) { roster[s.std_id] = true; });
+    rows.forEach(function (r, i) {
+      var id;
+      try { id = Students.cleanId(r && r.stdId); } catch (e) { skipped.push({ row: i + 1, stdId: String(r && r.stdId || '').substring(0, 30), why: 'รหัสนักศึกษาไม่ถูกต้อง' }); return; }
+      if (!roster[id]) { skipped.push({ row: i + 1, stdId: id, why: 'ไม่อยู่ในรายชื่อวิชานี้' }); return; }
+      if (seen[id]) { skipped.push({ row: i + 1, stdId: id, why: 'รหัสซ้ำ (ใช้แถวแรก)' }); return; }
+      seen[id] = true;
+      var key = c.course_id + '|' + id, ex = Db.byId('ScoreAdjust', key), raw = r.points, p = 0;
+      if (!isBlank_(raw)) {
+        var sgn = typeof raw === 'string' && /^\s*-/.test(raw) ? -1 : 1;
+        p = typeof raw === 'number' ? raw : parseNum_(String(raw).replace(/^\s*[+-]/, ''));
+        if (typeof raw !== 'number') p = isNaN(p) ? NaN : p * sgn;
+        if (isNaN(p) || Math.abs(p) > 100) { skipped.push({ row: i + 1, stdId: id, why: 'คะแนนปรับต้องเป็นตัวเลข −100 ถึง +100' }); return; }
+        p = r2_(p);
+      }
+      if (p === 0) { if (ex) { Db.remove('ScoreAdjust', key); cleared++; } return; }
+      var reason = String(r.reason === undefined || r.reason === null ? '' : r.reason).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 200);
+      var row = { points: p, reason: reason, updated_at: now, updated_by: user.email };
+      if (ex) Db.update('ScoreAdjust', key, row); else Db.insert('ScoreAdjust', Object.assign({ adj_key: key, course_id: c.course_id, std_id: id }, row));
+      saved++;
+    });
+    if (saved || cleared) Courses.touch(c.course_id);
+    Audit.log(user.email, 'score.adjust', c.course_id, { saved: saved, cleared: cleared });
+    return { saved: saved, cleared: cleared, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
+  }
+
+  /**
+   * ปรับคะแนนทับค่าของระบบ (เช็คชื่อ/งาน/สอบ): a = { courseId, typeId, rows:[{stdId, score, reason?}] }
+   *   score ว่าง = คืนค่าระบบ · ค่าที่ปรับถูกล็อก — ซิงก์อัตโนมัติรอบถัดไปไม่ทับ (แต่จำค่าระบบล่าสุดไว้เทียบ)
+   *   ประเภทที่กรอกเอง (MANUAL) ใช้เส้นทางเดิม (saveBulk) — ที่นี่รับเหมือนกันเพื่อให้หน้าเว็บเรียกที่เดียว
+   */
+  function override(user, a) {
+    var c = Courses.require(user, a.courseId), t = Db.byId('ScoreTypes', String(a.typeId || ''));
+    if (!t || t.course_id !== c.course_id) throw U.E('E_NOT_FOUND');
+    if (t.source === 'MANUAL') {
+      var m = writeRecords_(c.course_id, t, a.rows, user.email, false);
+      Audit.log(user.email, 'score.saveBulk', t.type_id, { saved: m.saved, cleared: m.cleared, skipped: m.skippedCount });
+      return { saved: m.saved, restored: 0, unchanged: m.unchanged, skipped: m.skipped, skippedCount: m.skippedCount };
+    }
+    var rows = a.rows;
+    if (!Array.isArray(rows) || !rows.length) throw U.E('E_BAD_REQUEST', { why: 'rows' });
+    if (rows.length > MAX_ROWS) throw U.E('E_BAD_REQUEST', { why: 'too_many', max: MAX_ROWS });
+    var max = Number(t.max_score), existing = {}, roster = {};
+    Db.findRows('ScoreRecords', 'type_id', t.type_id).forEach(function (r) { existing[r.std_id] = r; });
+    Students.roster(c.course_id).forEach(function (s) { roster[s.std_id] = true; });
+    var seen = {}, skipped = [], patch = {}, inserts = [], saved = 0, restored = 0, same = 0, now = U.nowIso();
+    rows.forEach(function (r, i) {
+      var id;
+      try { id = Students.cleanId(r && r.stdId); } catch (e) { skipped.push({ row: i + 1, stdId: String(r && r.stdId || '').substring(0, 30), why: 'รหัสนักศึกษาไม่ถูกต้อง' }); return; }
+      if (!roster[id]) { skipped.push({ row: i + 1, stdId: id, why: 'ไม่อยู่ในรายชื่อวิชานี้' }); return; }
+      if (seen[id]) { skipped.push({ row: i + 1, stdId: id, why: 'รหัสซ้ำ (ใช้แถวแรก)' }); return; }
+      seen[id] = true;
+      var ex = existing[id], locked = !!(ex && U.bool(ex.locked));
+      if (isBlank_(r.score)) {                                           // คืนค่าระบบ
+        if (!locked) { same++; return; }
+        patch[ex._row] = { score: ex.auto_value, locked: '', reason: '', updated_at: now, updated_by: user.email }; restored++; return;
+      }
+      var v = parseNum_(r.score);
+      if (isNaN(v)) { skipped.push({ row: i + 1, stdId: id, why: 'คะแนนไม่ใช่ตัวเลข' }); return; }
+      if (v > max + EPS) { skipped.push({ row: i + 1, stdId: id, why: 'เกินคะแนนเต็ม ' + max }); return; }
+      v = r2_(v);
+      var reason = String(r.reason === undefined || r.reason === null ? '' : r.reason).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 200);
+      if (ex) {
+        if (!locked && ex.score !== '' && Number(ex.score) === v) { same++; return; }                // เท่าค่าระบบอยู่แล้ว ไม่ต้องล็อก
+        if (locked && Number(ex.score) === v && String(ex.reason) === reason) { same++; return; }
+        patch[ex._row] = { score: v, locked: U.bstr(true), auto_value: locked ? ex.auto_value : ex.score, reason: reason, updated_at: now, updated_by: user.email };
+      } else {
+        inserts.push({ rec_key: t.type_id + '|' + id, course_id: c.course_id, type_id: t.type_id, std_id: id, score: v, updated_at: now, updated_by: user.email, auto_value: '', locked: U.bstr(true), reason: reason });
+      }
+      saved++;
+    });
+    if (Object.keys(patch).length) Db.bulkPatch('ScoreRecords', patch);
+    if (inserts.length) Db.insertMany('ScoreRecords', inserts);
+    if (saved || restored) Courses.touch(c.course_id);
+    Audit.log(user.email, 'score.override', t.type_id, { saved: saved, restored: restored, skipped: skipped.length });
+    return { saved: saved, restored: restored, unchanged: same, skipped: skipped.slice(0, 100), skippedCount: skipped.length };
+  }
+
+  function statOf_(vals) {
+    if (!vals.length) return { n: 0, mean: null, min: null, max: null };
+    var s = 0, mn = vals[0], mx = vals[0];
+    vals.forEach(function (v) { s += v; if (v < mn) mn = v; if (v > mx) mx = v; });
+    return { n: vals.length, mean: r2_(s / vals.length), min: r2_(mn), max: r2_(mx) };
+  }
+
+  /** หน้าสรุปคะแนนรายวิชา: ทุกคน × ทุกประเภท (+ธงที่อาจารย์ปรับ/ค่าของระบบ) + คะแนนปรับ + คะแนนรวม + เกรด + สถิติ */
+  function summary(user, courseId) {
+    var c = Courses.require(user, courseId);
+    Attendance.sweep(c.course_id);
+    var types = typesOf_(c.course_id), recs = {}, adj = {}, cuts = scaleOf_(c.course_id);
+    Db.findRows('ScoreRecords', 'course_id', c.course_id).forEach(function (r) { recs[r.type_id + '|' + r.std_id] = r; });
+    Db.findRows('ScoreAdjust', 'course_id', c.course_id).forEach(function (r) { adj[r.std_id] = r; });
+    var perType = {}; types.forEach(function (t) { perType[t.type_id] = []; });
+    var totals = [], grades = { A: 0, 'B+': 0, B: 0, 'C+': 0, C: 0, 'D+': 0, D: 0, F: 0 }, ungraded = 0;
+    var students = Students.roster(c.course_id).map(function (s) {
+      var cells = {}, base = 0, any = false;
+      types.forEach(function (t) {
+        var r = recs[t.type_id + '|' + s.std_id], max = Number(t.max_score), has = !!(r && r.score !== '' && r.score !== null && r.score !== undefined);
+        var v = has ? Number(r.score) : null, locked = !!(r && U.bool(r.locked));
+        if (has) { base += (v / max) * Number(t.pct); any = true; perType[t.type_id].push(v); }
+        cells[t.type_id] = { v: v, p: has ? r2_(v / max * 100) : null, locked: locked, auto: locked ? (r.auto_value === '' || r.auto_value === undefined ? null : Number(r.auto_value)) : null, reason: locked ? (r.reason || '') : '' };
+      });
+      base = r2_(base);
+      var aj = adj[s.std_id], pts = aj ? Number(aj.points) || 0 : 0, total = r2_(base + pts);
+      var graded = any || pts !== 0, grade = graded ? gradeFor_(total, cuts) : '';
+      if (graded) { totals.push(total); grades[grade]++; } else ungraded++;
+      return { stdId: s.std_id, name: s.name, cells: cells, base: base, adjust: aj ? { points: pts, reason: aj.reason || '' } : null, total: total, grade: grade };
+    });
+    var tot = totalPct_(types, '');
+    return {
+      course: { courseId: c.course_id, code: c.code, name: c.name, section: c.section },
+      types: types.map(function (t) { var o = typeOut_(t); o.stats = statOf_(perType[t.type_id]); return o; }),
+      totalPct: r2_(tot), students: students,
+      stats: Object.assign(statOf_(totals), { grades: grades, ungraded: ungraded }),
+      scale: { cuts: cuts, defaults: DEFAULT_CUTS, order: GRADE_ORDER }
+    };
+  }
+
   function exportCsv(user, courseId) {
     var c = Courses.require(user, courseId);
-    var tb = table(user, c.course_id);
-    var head = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล'].concat(tb.types.map(function (t) { return t.name + ' (% ของรายการ, สัดส่วน ' + t.pct + '%)'; })).concat(['คะแนนรวม (%)']);
+    var sm = summary(user, c.course_id);
+    var tb = { types: sm.types, students: sm.students.map(function (s) {
+      var pcts = {}; sm.types.forEach(function (t) { pcts[t.typeId] = s.cells[t.typeId].p; });
+      return { stdId: s.stdId, name: s.name, pcts: pcts, total: s.base, adj: s.adjust ? s.adjust.points : '', final: s.total, grade: s.grade };
+    }) };
+    var head = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล'].concat(tb.types.map(function (t) { return t.name + ' (% ของรายการ, สัดส่วน ' + t.pct + '%)'; })).concat(['คะแนนรวม (%)', 'คะแนนปรับ (+/-)', 'คะแนนรวมหลังปรับ (%)', 'เกรด']);
     var rows = [head];
     tb.students.forEach(function (s) {
-      rows.push([s.stdId, s.name].concat(tb.types.map(function (t) { var v = s.pcts[t.typeId]; return v === null ? '' : v; })).concat([s.total]));
+      rows.push([s.stdId, s.name].concat(tb.types.map(function (t) { var v = s.pcts[t.typeId]; return v === null ? '' : v; })).concat([s.total, s.adj, s.final, s.grade]));
     });
     var safe = (c.code + '-' + c.section).replace(/[^A-Za-z0-9ก-๙._-]+/g, '_');
     Audit.log(user.email, 'score.exportCsv', c.course_id, { rows: tb.students.length });
@@ -279,7 +456,7 @@ var Scores = (function () {
   function setRecords(courseId, typeId, rows, actor) {
     var t = Db.byId('ScoreTypes', typeId);
     if (!t || t.course_id !== courseId) throw U.E('E_NOT_FOUND');
-    return writeRecords_(courseId, t, rows, actor || 'system');
+    return writeRecords_(courseId, t, rows, actor || 'system', true);        // ซิงก์อัตโนมัติ: เคารพค่าที่อาจารย์ปรับทับ (locked)
   }
 
   /** ปรับชื่อ/คะแนนเต็มของประเภทอัตโนมัติ (เช่น แก้ชื่องาน) */
@@ -307,10 +484,12 @@ var Scores = (function () {
   function removeForStudents(courseId, stdIds) {
     var set = {};
     stdIds.forEach(function (id) { set[id] = true; });
+    Db.removeWhere('ScoreAdjust', function (o) { return o.course_id === courseId && set[o.std_id] === true; });
     return Db.removeWhere('ScoreRecords', function (o) { return o.course_id === courseId && set[o.std_id] === true; });
   }
 
   return {
+    summary: summary, override: override, adjust: adjust, gradeScale: gradeScale,
     listTypes: listTypes, saveType: saveType, deleteType: deleteType, table: table, saveBulk: saveBulk, exportCsv: exportCsv,
     ensureType: ensureType, checkPct: checkPct, setAutoPct: setAutoPct, pctMap: pctMap, setRecords: setRecords, updateAuto: updateAuto, removeAuto: removeAuto, countForStudent: countForStudent, removeForStudents: removeForStudents
   };

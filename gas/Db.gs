@@ -53,7 +53,14 @@ var Db = (function () {
     Students: {                       // รายชื่อนักศึกษาต่อวิชา · row_key = course_id|std_id
       pk: 'row_key',
       cols: [
-        ['row_key', T.TEXT, 260], ['course_id', T.TEXT, 170], ['std_id', T.TEXT, 130], ['name', T.TEXT, 260], ['added_at', T.DATETIME, 160]
+        ['row_key', T.TEXT, 260], ['course_id', T.TEXT, 170], ['std_id', T.TEXT, 130], ['name', T.TEXT, 260], ['added_at', T.DATETIME, 160],
+        ['group_no', T.INT, 80]            // v0.8.0 ลำดับกลุ่มที่อาจารย์จัดให้ (ว่าง = ยังไม่มีกลุ่ม) — ต่อท้ายเสมอ
+      ]
+    },
+    CourseGroups: {                   // v0.8.0 กลุ่มที่อาจารย์จัดไว้ต่อวิชา · grp_key = course_id|group_no · 1 คนอยู่ได้กลุ่มเดียว (Students.group_no)
+      pk: 'grp_key',
+      cols: [
+        ['grp_key', T.TEXT, 260], ['course_id', T.TEXT, 170], ['group_no', T.INT, 80], ['name', T.TEXT, 200], ['rep_std', T.TEXT, 130], ['created_at', T.DATETIME, 160]
       ]
     },
     StudentPIN: {                     // 1 คน 1 PIN ต่อภาคเรียน (std_id = "termId|stdId") ใช้ทุกวิชา/ทุกระบบในภาคนั้น · เก็บเฉพาะแฮช (SHA-256 + salt + pepper)
@@ -80,8 +87,20 @@ var Db = (function () {
       pk: 'rec_key',
       cols: [
         ['rec_key', T.TEXT, 300], ['course_id', T.TEXT, 170], ['type_id', T.TEXT, 170], ['std_id', T.TEXT, 130],
-        ['score', T.NUM, 90], ['updated_at', T.DATETIME, 160], ['updated_by', T.TEXT, 220]
+        ['score', T.NUM, 90], ['updated_at', T.DATETIME, 160], ['updated_by', T.TEXT, 220],
+        ['auto_value', T.NUM, 90], ['locked', T.BOOL, 80], ['reason', T.TEXT, 300]      // v0.10.0 อาจารย์ปรับทับค่าของระบบ: locked = จริง → ซิงก์อัตโนมัติไม่ทับ · auto_value = ค่าที่ระบบคิดล่าสุด
       ]
+    },
+    ScoreAdjust: {                    // v0.10.0 คะแนนปรับรายคน (+/-) บวกเข้าคะแนนรวม (% ของวิชา) · adj_key = course_id|std_id
+      pk: 'adj_key',
+      cols: [
+        ['adj_key', T.TEXT, 260], ['course_id', T.TEXT, 170], ['std_id', T.TEXT, 130], ['points', T.NUM, 90], ['reason', T.TEXT, 300],
+        ['updated_at', T.DATETIME, 160], ['updated_by', T.TEXT, 220]
+      ]
+    },
+    GradeScale: {                     // v0.10.0 เกณฑ์เกรดต่อวิชา (JSON ขั้นต่ำของ A, B+, B, C+, C, D+, D) · ไม่มีแถว = ค่าเริ่มต้น
+      pk: 'course_id',
+      cols: [['course_id', T.TEXT, 170], ['cuts', T.TEXT, 300], ['updated_at', T.DATETIME, 160], ['updated_by', T.TEXT, 220]]
     },
 
     /* ---------- v0.3.0 เช็คชื่อ ---------- */
@@ -130,7 +149,8 @@ var Db = (function () {
         ['kind', T.TEXT, 80], ['max_score', T.NUM, 90], ['due_at', T.TEXT, 150], ['late_ok', T.BOOL, 80], ['close_at', T.TEXT, 150],
         ['status', T.TEXT, 80], ['max_group', T.INT, 90], ['show_grades', T.BOOL, 90], ['link_url', T.TEXT, 300], ['folder_id', T.TEXT, 240],
         ['created_by', T.TEXT, 220], ['created_at', T.DATETIME, 160], ['updated_at', T.DATETIME, 160],
-        ['require_file', T.BOOL, 100]       // v0.7.0 (ต่อท้ายเสมอ — ห้ามแทรกกลางตาราง) · ว่าง = ต้องแนบไฟล์ (ค่าเริ่มต้น)
+        ['require_file', T.BOOL, 100],      // v0.7.0 (ต่อท้ายเสมอ — ห้ามแทรกกลางตาราง) · ว่าง = ต้องแนบไฟล์ (ค่าเริ่มต้น)
+        ['group_mode', T.TEXT, 90]          // v0.8.0 งานกลุ่ม: 'course' = ใช้กลุ่มที่อาจารย์จัดไว้ · ว่าง/'self' = นักศึกษาจัดกลุ่มเอง
       ]
     },
     AsgGroups: {                      // งานกลุ่ม: 1 กลุ่ม = ตัวแทน 1 คน + สมาชิก (ดู AsgMembers)
@@ -152,6 +172,20 @@ var Db = (function () {
         ['note', T.TEXT, 420], ['link', T.TEXT, 300], ['first_at', T.DATETIME, 160], ['updated_at', T.DATETIME, 160]
       ]
     },
+    AsgSubLog: {                      // v0.9.0 ประวัติการแก้งานกลุ่มที่ส่ง: ใคร/เมื่อไร/ทำอะไร (action: note | upload | remove) · เรียงตามเวลา = ตั้งแต่คนแรกถึงคนล่าสุด
+      pk: 'log_id',
+      cols: [
+        ['log_id', T.TEXT, 170], ['sub_key', T.TEXT, 320], ['asg_id', T.TEXT, 170], ['course_id', T.TEXT, 170], ['std_id', T.TEXT, 130],
+        ['at', T.DATETIME, 160], ['action', T.TEXT, 80], ['detail', T.TEXT, 200]
+      ]
+    },
+    Inbox: {                          // v0.9.0 ข้อความจากนักศึกษาถึงอาจารย์ (kind: general | member = แจ้งเรื่องเพื่อนร่วมกลุ่ม) · status: new | read | done
+      pk: 'msg_id',
+      cols: [
+        ['msg_id', T.TEXT, 170], ['course_id', T.TEXT, 170], ['asg_id', T.TEXT, 170], ['from_std', T.TEXT, 130], ['about_std', T.TEXT, 130],
+        ['kind', T.TEXT, 80], ['message', T.TEXT, 520], ['created_at', T.DATETIME, 160], ['status', T.TEXT, 80], ['handled_by', T.TEXT, 220], ['handled_at', T.DATETIME, 160]
+      ]
+    },
     AsgFiles: {                       // ไฟล์ในงานที่ส่ง (เก็บจริงใน Drive ส่วนกลาง) · เพิ่มได้หลายไฟล์ต่อการส่ง
       pk: 'file_id',
       cols: [
@@ -169,7 +203,7 @@ var Db = (function () {
   };
 
   var FORMAT = { TEXT: '@', JSON: '@', DATETIME: '@', BOOL: '@', NUM: '0.##', INT: '0' };
-  var SCHEMA_VERSION = '0.7.1';
+  var SCHEMA_VERSION = '0.10.0';
 
   var _ss = null, _checked = false, _cache = {}, _props = null, _idx = {};
   var _rec = {}, _sheets = {}, _last = {}, _xv = {};      // _rec = pk→แถว (คู่กับ _cache) · _sheets = ออบเจ็กต์ชีต · _last = แถวสุดท้าย · _xv = เวอร์ชันแคชข้าม execution (ต่อ execution)
@@ -177,7 +211,7 @@ var Db = (function () {
   /* ---------- แคชข้าม execution (CacheService) ----------
    * ตารางเล็กที่ถูกอ่านซ้ำเกือบทุกคำขอและแก้ไม่บ่อย: อ่านจากแคชแทนชีต · ทุกการเขียนเปลี่ยนเลขเวอร์ชัน (คีย์แคชใหม่) → ไม่มีข้อมูลเก่าค้าง
    * (เขียนอยู่ใน lock เสมอ และเปลี่ยนเวอร์ชันก่อนปล่อย lock · แคชพังหรือใหญ่เกิน = อ่านชีตตามปกติ) */
-  var XT = { Terms: 1, Courses: 1, Users: 1, Students: 1 };
+  var XT = { Terms: 1, Courses: 1, Users: 1, Students: 1, CourseGroups: 1, Inbox: 1 };
   var X_TTL = 600, SMALL_ROWS = 400;
   function xver_(name) {
     if (_xv[name] === undefined) {

@@ -63,15 +63,18 @@ var Students = (function () {
     var ids = roster.map(function (s) { return s.std_id; });
     var st = Pin.statuses(c.course_id, ids), req = Pin.openRequestIds(c.course_id);
     var counts = { total: roster.length, set: 0, temp: 0, none: 0, requests: 0 };
+    var sn = Groups.snapshot(c.course_id), gOf = {};
+    sn.groups.forEach(function (g) { g.members.forEach(function (m) { gOf[m.stdId] = g.no; }); });
     var students = roster.map(function (s) {
       var p = st[s.std_id];
       counts[p]++;
       if (req[s.std_id]) counts.requests++;
-      return { stdId: s.std_id, name: s.name, pinStatus: p, resetRequested: !!req[s.std_id] };
+      return { stdId: s.std_id, name: s.name, pinStatus: p, resetRequested: !!req[s.std_id], groupNo: gOf[s.std_id] || null };
     });
     return {
       course: { courseId: c.course_id, code: c.code, name: c.name, section: c.section, termId: c.term_id },
-      students: students, counts: counts
+      students: students, counts: counts,
+      groups: sn.groups.map(function (g) { return { groupNo: g.no, name: g.name, count: g.members.length, repStd: g.rep }; })
     };
   }
 
@@ -165,6 +168,8 @@ var Students = (function () {
     var deleted = {};
     STUDENT_CASCADE.forEach(function (p) { deleted[p.key] = p.remove(courseId, stdIds) || 0; });
     Db.removeWhere('Students', function (o) { return o.course_id === courseId && set[o.std_id] === true; });
+    Groups.dropReps(courseId, stdIds);
+    Inbox.dropStudents(courseId, stdIds);
     return deleted;
   }
 

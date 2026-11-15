@@ -87,11 +87,11 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
       return (u.name + ' ' + u.members.map(function (m) { return m.stdId + ' ' + m.name; }).join(' ')).toLowerCase().indexOf(q) >= 0;
     });
     var group = A.kind === 'group';
-    if (!rows.length) { $('#tbl').innerHTML = '<div class="callout" id="noRows">' + (R.units.length ? 'ไม่มีรายการตามตัวกรอง' : (group ? 'ยังไม่มีกลุ่ม — นักศึกษาต้องสร้างกลุ่มก่อนจึงจะส่งงานได้' : 'วิชานี้ยังไม่มีนักศึกษา')) + '</div>'; return; }
+    if (!rows.length) { $('#tbl').innerHTML = '<div class="callout" id="noRows">' + (R.units.length ? 'ไม่มีรายการตามตัวกรอง' : (group ? (A.groupMode === 'course' ? 'ยังไม่มีกลุ่มที่มีสมาชิก — จัดกลุ่มที่หน้า “นักศึกษา”' : 'ยังไม่มีกลุ่ม — นักศึกษาต้องสร้างกลุ่มก่อนจึงจะส่งงานได้') : 'วิชานี้ยังไม่มีนักศึกษา')) + '</div>'; return; }
     $('#tbl').innerHTML = '<div class="scroll"><table id="subTbl"><thead><tr><th>' + (group ? 'กลุ่ม' : 'นักศึกษา') + '</th><th>สถานะ</th><th class="num">คะแนน</th></tr></thead><tbody>' +
       rows.map(function (u) {
         return '<tr data-u="' + esc(u.subKey) + '" style="cursor:pointer"><td><a href="#" data-open="' + esc(u.subKey) + '"><b>' + esc(u.name) + '</b></a>' +
-          '<div class="small muted">' + (group ? esc(u.members.length + ' คน · ตัวแทน ' + (u.rep ? u.rep.name : '')) : esc(u.members[0].stdId)) + '</div></td>' +
+          '<div class="small muted">' + (group ? esc(u.members.length + ' คน' + (u.rep ? ' · ตัวแทน ' + u.rep.name : '')) : esc(u.members[0].stdId)) + '</div></td>' +
           '<td>' + pillOf(u) + (u.submitted ? '<div class="small muted">' + esc(fmt(u.updatedAt)) + ' · ' + u.files.length + ' ไฟล์' + (u.link ? ' · ลิงก์' : '') + '</div>' : '') + '</td>' +
           '<td class="num"><b>' + esc(scoreText(u)) + '</b></td></tr>';
       }).join('') + '</tbody></table></div><p class="small muted">กดชื่อเพื่อดูงานที่ส่งและให้คะแนน · ' + rows.length + ' รายการ</p>';
@@ -112,7 +112,7 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
     var u = unitById(k); if (!u) return;
     cur = u; var group = A.kind === 'group';
     $('#uTitle').textContent = u.name;
-    var h = '<div class="small muted">' + (group ? 'สมาชิก ' + u.members.length + ' คน · ตัวแทนส่งงาน: ' + esc(u.rep ? u.rep.name + ' (' + u.rep.stdId + ')' : '') : esc(u.members[0].stdId)) + '</div>';
+    var h = '<div class="small muted">' + (group ? 'สมาชิก ' + u.members.length + ' คน' + (u.rep ? ' · ตัวแทน/ผู้ประสานงาน: ' + esc(u.rep.name + ' (' + u.rep.stdId + ')') : '') : esc(u.members[0].stdId)) + '</div>';
     if (u.submitted) {
       h += '<div class="callout ' + (u.late ? 'warn' : 'good') + '" id="uSub"><b>ส่งแล้ว</b> ' + esc(fmt(u.updatedAt)) + (u.late ? ' · <b>ส่งช้า</b>' : '') + (u.firstAt !== u.updatedAt ? '<br><span class="small">ส่งครั้งแรก ' + esc(fmt(u.firstAt)) + '</span>' : '') + '</div>';
       if (u.files.length) h += '<div class="stack-s" id="uFiles">' + u.files.map(fileBtns).join('') + '</div>';
@@ -120,6 +120,17 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
       if (u.link) h += '<div><span class="small muted">ลิงก์</span><br>' + (safeUrl(u.link) ? '<a href="' + esc(safeUrl(u.link)) + '" target="_blank" rel="noopener noreferrer">' + esc(u.link) + '</a>' : esc(u.link)) + '</div>';
     } else h += '<div class="callout" id="uSub">ยังไม่ได้ส่งงาน' + (group ? '' : '') + ' — ให้คะแนนได้ (เช่น 0 คะแนนกรณีไม่ส่ง)</div>';
 
+    if (group) {
+      var hs = u.history || [], reps = [], ACT = { note: 'แก้ข้อความ/ลิงก์', upload: 'เพิ่มไฟล์', remove: 'ลบไฟล์' };
+      h += '<div class="stack-s" id="uHist"><h3>ประวัติการแก้ไข</h3>' + (hs.length
+        ? '<p class="small">ส่งครั้งแรกโดย <b>' + esc(u.firstBy.name) + '</b> (' + esc(fmt(u.firstBy.at)) + ') · แก้ล่าสุดโดย <b>' + esc(u.lastBy.name) + '</b> (' + esc(fmt(u.lastBy.at)) + ')</p>' +
+          '<ol class="small" id="uHistList" style="margin:0;padding-left:20px">' + hs.map(function (x, i) { return '<li>' + esc(fmt(x.at)) + ' · <b>' + esc(x.name) + '</b> — ' + (i === 0 ? 'ส่งครั้งแรก: ' : '') + esc(ACT[x.action] || x.action) + (x.detail ? ' <span class="muted">' + esc(x.detail) + '</span>' : '') + '</li>'; }).join('') + '</ol>' + (u.historyTruncated ? '<p class="small muted">แสดงรายการแรกและรายการล่าสุด</p>' : '')
+        : '<p class="small muted">ยังไม่มีประวัติการแก้ไข</p>') + '</div>';
+      u.members.forEach(function (m) { (m.reports || []).forEach(function (q) { reps.push({ m: m, q: q }); }); });
+      if (reps.length) h += '<div class="callout warn stack-s" id="uReports"><b>นักศึกษาแจ้งเรื่องสมาชิกในกลุ่มนี้ (' + reps.length + ')</b><ul style="margin:0;padding-left:20px">' + reps.map(function (r) {
+        return '<li><b>' + esc(r.m.name) + '</b> ถูกแจ้งโดย ' + esc(r.q.from) + ' (' + esc(fmt(r.q.at)) + '): <span style="white-space:pre-wrap">' + esc(r.q.message) + '</span></li>';
+      }).join('') + '</ul><p class="small">ใช้ประกอบการให้คะแนนรายคน — ติ๊ก “ให้คะแนนสมาชิกแต่ละคนไม่เท่ากัน” ด้านล่าง · ดูทั้งหมดที่ <a href="' + root + 't/inbox.html?id=' + encodeURIComponent(A.courseId) + '">กล่องข้อความ</a></p></div>';
+    }
     h += '<hr style="border:0;border-top:1px solid var(--line);width:100%"><h3>ให้คะแนน <span class="muted small">(เต็ม ' + esc(A.maxScore) + ')</span></h3>';
     var first = u.members[0], allSame = u.members.every(function (m) { return m.score === first.score && m.feedback === first.feedback; });
     h += '<div class="field"><label for="gScore">' + (group ? 'คะแนนทั้งกลุ่ม' : 'คะแนน') + '</label><input id="gScore" type="text" inputmode="decimal" autocomplete="off" value="' + esc(allSame && first.score !== null ? first.score : '') + '"><span class="help" id="gPct"></span></div>' +
@@ -127,7 +138,7 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
     if (group) {
       h += '<label class="check"><input type="checkbox" id="gEach"' + (allSame ? '' : ' checked') + '><span>ให้คะแนนสมาชิกแต่ละคนไม่เท่ากัน</span></label><div id="gMem" class="stack-s" ' + (allSame ? 'hidden' : '') + '>' +
         u.members.map(function (m) {
-          return '<div class="row" data-m="' + esc(m.stdId) + '"><span class="grow small">' + esc(m.stdId) + ' ' + esc(m.name) + '</span><input class="sc-in" type="text" inputmode="decimal" aria-label="คะแนน ' + esc(m.name) + '" value="' + esc(m.score === null ? '' : m.score) + '"></div>';
+          return '<div class="row" data-m="' + esc(m.stdId) + '"><span class="grow small">' + esc(m.stdId) + ' ' + esc(m.name) + (m.reports && m.reports.length ? ' <span class="pill warn">ถูกแจ้ง ' + m.reports.length + '</span>' : '') + '</span><input class="sc-in" type="text" inputmode="decimal" aria-label="คะแนน ' + esc(m.name) + '" value="' + esc(m.score === null ? '' : m.score) + '"></div>';
         }).join('') + '</div>';
     }
     h += '<div class="err" id="gErr" role="alert"></div><div class="row"><button class="btn primary" type="button" id="gSave">บันทึกคะแนน</button><button class="btn ghost" type="button" id="gClear">ล้างคะแนน</button></div>' +

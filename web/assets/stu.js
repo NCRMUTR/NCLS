@@ -150,5 +150,46 @@
     });
   }
 
-  HBT.stu = { sess: sess, call: call, login: login, clear: clear, loginBox: loginBox, fmtSize: fmtSize, readB64: readB64, shrinkImage: shrinkImage, opt: opt };
+  /**
+   * ปุ่ม “แจ้งอาจารย์” (กล่องข้อความถึงอาจารย์) ใช้ร่วมกันทุกหน้านักศึกษา
+   * o = { me: รหัสตัวเอง, asgId?, asgTitle?, members?: [{stdId,name}] }  (members = เพื่อนในกลุ่ม ให้เลือกว่าเรื่องนี้เกี่ยวกับใคร)
+   */
+  var ST_TH = { new: 'ส่งแล้ว (อาจารย์ยังไม่อ่าน)', read: 'อาจารย์อ่านแล้ว', done: 'อาจารย์จัดการแล้ว' };
+  function inboxOpen(o) {
+    var m = document.getElementById('mInbox');
+    if (!m) {
+      m = document.createElement('div'); m.className = 'modal'; m.id = 'mInbox'; m.hidden = true;
+      m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-labelledby', 'ibTitle');
+      document.body.appendChild(m);
+    }
+    var friends = (o.members || []).filter(function (x) { return x.stdId !== o.me; });
+    m.innerHTML = '<div class="mbox stack"><div class="row sp"><h2 id="ibTitle">แจ้งอาจารย์</h2><button class="btn sm ghost" data-close type="button">ปิด</button></div>' +
+      '<p class="small muted">ข้อความนี้ถึงอาจารย์ผู้สอนเท่านั้น เพื่อนที่ถูกกล่าวถึงจะไม่เห็น · ส่งได้วันละไม่เกิน 10 ข้อความ · ยังไม่มีการตอบกลับในระบบ ถ้าด่วนให้แจ้งอาจารย์โดยตรง</p>' +
+      (o.asgTitle ? '<p class="small">เกี่ยวกับงาน: <b>' + esc(o.asgTitle) + '</b></p>' : '') +
+      (friends.length ? '<div class="field"><label for="ibAbout">เรื่องนี้เกี่ยวกับเพื่อนในกลุ่มคนไหน (ไม่บังคับ)</label><select id="ibAbout"><option value="">— ไม่ระบุ / เรื่องทั่วไป —</option>' +
+        friends.map(function (f) { return opt(f.stdId, f.name + ' (' + f.stdId + ')'); }).join('') + '</select></div>' : '') +
+      '<div class="field"><label for="ibMsg">ข้อความ</label><textarea id="ibMsg" rows="4" maxlength="500" placeholder="เช่น เพื่อนไม่ได้มาช่วยทำงานเลยตั้งแต่ต้น"></textarea><span class="help" id="ibCnt">0 / 500</span></div>' +
+      '<div class="err" id="ibErr" role="alert"></div>' +
+      '<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close type="button">ยกเลิก</button><button class="btn primary" type="button" id="ibGo">ส่งถึงอาจารย์</button></div>' +
+      '<details id="ibMineBox"><summary class="small">ข้อความที่ฉันเคยส่ง</summary><div id="ibMine" class="stack-s small" style="margin-top:8px"><span class="muted">กำลังโหลด…</span></div></details></div>';
+    var ta = m.querySelector('#ibMsg');
+    ta.addEventListener('input', function () { m.querySelector('#ibCnt').textContent = ta.value.length + ' / 500'; });
+    m.querySelector('#ibGo').addEventListener('click', function () {
+      var b = this, err = m.querySelector('#ibErr'), ab = m.querySelector('#ibAbout');
+      err.textContent = '';
+      if (!ta.value.trim()) { err.textContent = 'กรุณาพิมพ์ข้อความ'; return; }
+      HBT.busy(b, function () {
+        return call('stu.inboxSend', { message: ta.value, asgId: o.asgId || '', aboutStd: ab ? ab.value : '' }).then(function () { HBT.modal.close('mInbox'); HBT.toast('ส่งถึงอาจารย์แล้ว', 'good'); });
+      }).catch(function (e) { err.textContent = HBT.errMsg(e); });
+    });
+    call('stu.inboxMine', {}).then(function (r) {
+      var box = m.querySelector('#ibMine'); if (!box) return;
+      box.innerHTML = r.messages.length ? r.messages.map(function (x) {
+        return '<div class="card flat"><div class="muted">' + esc(HBT.fmtBE(x.createdAt, true)) + ' · <b>' + esc(ST_TH[x.status] || x.status) + '</b>' + (x.asgTitle ? ' · งาน ' + esc(x.asgTitle) : '') + (x.aboutName ? ' · เกี่ยวกับ ' + esc(x.aboutName) : '') + '</div><div style="white-space:pre-wrap">' + esc(x.message) + '</div></div>';
+      }).join('') : '<span class="muted">ยังไม่เคยส่งข้อความ</span>';
+    }, function () { var box = m.querySelector('#ibMine'); if (box) box.innerHTML = '<span class="muted">โหลดไม่สำเร็จ</span>'; });
+    HBT.modal.open('mInbox');
+  }
+
+  HBT.stu = { inboxOpen: inboxOpen, sess: sess, call: call, login: login, clear: clear, loginBox: loginBox, fmtSize: fmtSize, readB64: readB64, shrinkImage: shrinkImage, opt: opt };
 })();

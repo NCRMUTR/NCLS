@@ -18,9 +18,9 @@ var Reset = (function () {
 
   /** ตารางที่มี course_id — ลบทั้งหมดตอนรีเซ็ตวิชา (ลูกก่อนแม่) · ตารางใหม่ของระบบอื่น "ต้อง" มาเพิ่มที่นี่ (มีเทสต์ตรวจ) */
   var COURSE_TABLES = [
-    'AsgFiles', 'AsgSubs', 'AsgGrades', 'AsgMembers', 'AsgGroups', 'Assignments',
+    'AsgSubLog', 'Inbox', 'AsgFiles', 'AsgSubs', 'AsgGrades', 'AsgMembers', 'AsgGroups', 'Assignments',
     'AttApprovals', 'AttDevices', 'AttRecords', 'AttSessions',
-    'ScoreRecords', 'ScoreTypes', 'PinRequests', 'Students'
+    'ScoreAdjust', 'GradeScale', 'ScoreRecords', 'ScoreTypes', 'PinRequests', 'CourseGroups', 'Students'
   ];
   var DEFAULT_BUDGET_MS = 40000;
 

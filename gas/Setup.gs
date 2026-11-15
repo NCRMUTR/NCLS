@@ -149,6 +149,8 @@ function setupDiag() {
     ['Courses', 'Courses.gs', typeof Courses],
     ['Db', 'Db.gs', typeof Db],
     ['ExamLink', 'ExamLink.gs', typeof ExamLink],
+    ['Groups', 'Groups.gs', typeof Groups],
+    ['Inbox', 'Inbox.gs', typeof Inbox],
     ['Pin', 'Pin.gs', typeof Pin],
     ['Reset', 'Reset.gs', typeof Reset],
     ['ROUTES', 'Router.gs', typeof ROUTES],

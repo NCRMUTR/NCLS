@@ -58,6 +58,8 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
       '<div class="grid g3">' +
       '<a class="card link-card" id="goStudents" href="' + root + 't/students.html?id=' + q + '"><h3>รายชื่อนักศึกษา</h3><p class="small muted">เพิ่ม/นำเข้าจาก CSV · ดูสถานะ PIN / รีเซ็ต PIN (ออกรหัสชั่วคราว) · ลบนักศึกษา</p><span class="arrow">เปิด ›</span></a>' +
       '<a class="card link-card" id="goScores" href="' + root + 't/scores.html?id=' + q + '"><h3>คะแนน</h3><p class="small muted">กำหนดประเภทคะแนนและน้ำหนัก · กรอก/วางจาก Excel · ส่งออก CSV</p><span class="arrow">เปิด ›</span></a>' +
+      '<a class="card link-card" id="goSummary" href="' + root + 't/summary.html?id=' + q + '"><h3>สรุปคะแนน</h3><p class="small muted">ดูคะแนนทุกประเภทของทุกคนในหน้าเดียว · แก้ได้ทุกช่อง (รวมที่ระบบคิดให้) · คะแนนปรับ +/− · เกรด · สถิติ</p><span class="arrow">เปิด ›</span></a>' +
+      '<a class="card link-card" id="goInbox" href="' + root + 't/inbox.html?id=' + q + '"><div class="row sp"><h3>กล่องข้อความจากนักศึกษา</h3>' + (c.inboxNew ? '<span class="pill bad" id="inboxNew">ใหม่ ' + c.inboxNew + '</span>' : '<span class="pill">ไม่มีข้อความใหม่</span>') + '</div><p class="small muted">เรื่องที่นักศึกษาแจ้งอาจารย์ เช่น ปัญหาการส่งงาน หรือเพื่อนในกลุ่มไม่ช่วยงาน</p><span class="arrow">เปิด ›</span></a>' +
       '<a class="card link-card" id="goBackup" href="' + root + 't/backup.html?id=' + q + '"><div class="row sp"><h3>สำรองข้อมูลวิชา</h3>' + backupPill(c) + '</div><p class="small muted">ดาวน์โหลดรายชื่อ คะแนน เช็คชื่อ ข้อสอบ และไฟล์งานของนักศึกษาเก็บไว้ก่อนสิ้นภาคเรียน</p><span class="arrow">เปิด ›</span></a>' +
       '</div>' +
       sysSection(q) +

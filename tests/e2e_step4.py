@@ -421,8 +421,9 @@ def _():
     # เพื่อน (สมาชิก) เห็นกลุ่ม แต่ส่งไม่ได้
     m = student()
     m.page.goto(BASE + link(a)); stu_login(m, '660002'); m.page.wait_for_selector('#gMembers')
-    assert 'สมาชิก' in m.page.inner_text('#groupCard') and 'ตัวแทนกลุ่ม' in m.page.inner_text('#groupCard')
-    assert 'เฉพาะตัวแทน' in m.page.inner_text('#whyNot') and m.page.locator('#pick').count() == 0 and m.page.locator('#gedit').count() == 0
+    assert 'สมาชิก' in m.page.inner_text('#groupCard') and 'ทุกคนในกลุ่ม' in m.page.inner_text('#groupCard')
+    assert m.page.locator('#gedit').count() == 0                      # แก้รายชื่อสมาชิกได้เฉพาะตัวแทน · แต่สมาชิกส่ง/แก้งานได้ (มีปุ่มเลือกไฟล์)
+    m.page.wait_for_selector('#pick')
     # คนที่ 4 ไม่เห็นเพื่อนที่มีกลุ่มแล้วในรายชื่อเลือก
     o = student()
     o.page.goto(BASE + link(a)); stu_login(o, '660004'); o.page.wait_for_selector('#gmk')

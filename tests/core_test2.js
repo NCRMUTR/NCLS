@@ -567,7 +567,7 @@ test('exportCsv: หัวคอลัมน์/คะแนน/รวม ถู
   assert.strictEqual(lines.length >= 4, true);
   assert.ok(lines[0].startsWith('รหัสนักศึกษา,ชื่อ-นามสกุล,'));
   lines.forEach(l => l.split(',').forEach(cell => assert.ok(!/^"?[=+@]/.test(cell), 'injection: ' + cell)));
-  assert.ok(lines[1].indexOf('660001') === 0 && lines[1].endsWith(',50'));
+  assert.ok(lines[1].indexOf('660001') === 0 && lines[1].endsWith(',50,,50,D'), lines[1]);       // รวม · คะแนนปรับ (ว่าง) · รวมหลังปรับ · เกรด
 });
 
 /* ============================================================ */

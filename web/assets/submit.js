@@ -7,7 +7,7 @@
   var st = { tid: HBT.qs('t') || '', code: HBT.qs('c') || '', res: null, T: null, log: [], uploading: false, draft: { note: '', link: '' }, editGroup: false };
   var WHY = {
     E_ASG_CLOSED: 'งานนี้ปิดรับแล้ว', E_ASG_GRADED: 'อาจารย์ตรวจและให้คะแนนแล้ว จึงแก้ไขไม่ได้',
-    E_ASG_NO_GROUP: 'งานกลุ่ม — ต้องมีกลุ่มก่อนจึงจะส่งได้', E_ASG_NOT_REP: 'งานกลุ่ม — ส่งงานได้เฉพาะตัวแทนกลุ่ม'
+    E_ASG_NO_GROUP: 'งานกลุ่ม — ต้องมีกลุ่มก่อนจึงจะส่งได้', E_ASG_NOT_REP: 'เฉพาะตัวแทนกลุ่มที่แก้รายชื่อสมาชิกได้'
   };
 
   if (!HBT.api.configuredCore()) {
@@ -95,7 +95,8 @@
     var asgId = st.res.asgId;
     return S.call('stu.task', { asgId: asgId }).then(function (t) {
       st.T = t;
-      if (!st.uploading) { st.draft.note = t.sub ? t.sub.note : ''; st.draft.link = t.sub ? t.sub.link : ''; }
+      if (!st.uploading && !st.keepDraft) { st.draft.note = t.sub ? t.sub.note : ''; st.draft.link = t.sub ? t.sub.link : ''; }
+      st.keepDraft = false;
       view();
     }, function (e) {
       if (e.code === 'E_AUTH') { loginScreen('หมดเวลาเข้าใช้งาน (2 ชั่วโมง) — ใส่ PIN อีกครั้งเพื่อทำต่อ'); return; }
@@ -141,10 +142,31 @@
       '<p class="small muted">ผู้ส่ง: <b>' + esc(me.name) + '</b> (' + esc(me.stdId) + ')</p></section>' +
       '<div id="status">' + statusBanner(t) + '</div>' +
       (a.kind === 'group' ? '<section class="card stack" id="groupCard"></section>' : '') +
-      '<section class="card stack" id="subCard"></section>' + foot();
+      '<section class="card stack" id="subCard"></section>' +
+      (a.kind === 'group' ? '<section class="card stack" id="histCard"></section>' : '') +
+      '<section class="card stack-s" id="helpCard"><div class="row sp"><span class="small muted">' + (a.kind === 'group' ? 'เพื่อนในกลุ่มไม่ช่วยงาน หรือมีปัญหาอื่น?' : 'มีปัญหากับงานนี้?') + '</span><button class="btn sm" type="button" id="ibBtn">แจ้งอาจารย์</button></div></section>' + foot();
     bindFoot();
-    if (a.kind === 'group') renderGroup();
+    $('#ibBtn').addEventListener('click', function () {
+      S.inboxOpen({ me: me.stdId, asgId: a.asgId, asgTitle: a.title, members: t.group ? t.group.members : [] });
+    });
+    if (a.kind === 'group') { renderGroup(); renderHist(); }
     renderSub();
+  }
+
+  /* ---------- ประวัติการแก้ไข (งานกลุ่ม): ตั้งแต่คนแรกที่ส่งถึงคนล่าสุดที่แก้ ---------- */
+  var ACT = { note: 'แก้ข้อความ/ลิงก์', upload: 'เพิ่มไฟล์', remove: 'ลบไฟล์' };
+  function renderHist() {
+    var t = st.T, box = $('#histCard'), hs = t.history || [];
+    if (!box) return;
+    if (!t.group) { box.hidden = true; return; }
+    box.hidden = false;
+    if (!hs.length) { box.innerHTML = '<h3>ประวัติการแก้ไข</h3><p class="small muted" id="noHist">ยังไม่มีใครส่งหรือแก้งานนี้</p>'; return; }
+    var f = t.sub && t.sub.firstBy, l = t.sub && t.sub.lastBy;
+    box.innerHTML = '<h3>ประวัติการแก้ไข</h3>' +
+      (f && l ? '<p class="small" id="histSum">ส่งครั้งแรกโดย <b>' + esc(f.name) + '</b> (' + esc(fmt(f.at)) + ') · แก้ล่าสุดโดย <b>' + esc(l.name) + '</b> (' + esc(fmt(l.at)) + ')</p>' : '') +
+      '<ol class="stack-s small" id="histList" style="margin:0;padding-left:20px">' + hs.map(function (h, i) {
+        return '<li>' + esc(fmt(h.at)) + ' · <b>' + esc(h.name) + '</b> — ' + (i === 0 ? 'ส่งครั้งแรก: ' : '') + esc(ACT[h.action] || h.action) + (h.detail && h.action !== 'note' ? ' <span class="mono">' + esc(h.detail) + '</span>' : (h.detail ? ' (' + esc(h.detail) + ')' : '')) + '</li>';
+      }).join('') + '</ol>' + (t.historyTruncated ? '<p class="small muted">แสดงรายการแรกและรายการล่าสุด (ตัดช่วงกลางออก)</p>' : '');
   }
 
   /* ---------- กลุ่ม ---------- */
@@ -169,8 +191,36 @@
   }
   function $$checked(box) { return HBT.$$('input[name=mem]:checked', box).map(function (c) { return c.value; }); }
 
+  /** dropdown กลุ่ม (อาจารย์จัด): กลุ่มอื่นเห็นแค่ลำดับ/ชื่อ/จำนวนคน — ไม่เห็นสมาชิกและงานที่ส่ง */
+  function bindGSel(box, gs) {
+    var sel = $('#gSel', box); if (!sel) return;
+    sel.addEventListener('change', function () {
+      var x = gs.filter(function (g) { return String(g.groupNo) === sel.value; })[0], other = $('#gOther', box), mineBox = $('#gMine', box);
+      if (!x || x.mine) { other.hidden = true; if (mineBox) mineBox.hidden = false; return; }
+      other.hidden = false; if (mineBox) mineBox.hidden = true;
+      other.innerHTML = '<b>กลุ่ม ' + x.groupNo + (x.name ? ' · ' + esc(x.name) : '') + '</b> — ' + x.count + ' คน<br>คุณไม่ใช่สมาชิกกลุ่มนี้ จึงดูรายชื่อสมาชิกและงานที่ส่งของกลุ่มนี้ไม่ได้';
+    });
+  }
   function renderGroup() {
     var t = st.T, a = t.asg, g = t.group, box = $('#groupCard'), max = a.maxGroup;
+    if (t.fixed) {                                                  // อาจารย์จัดกลุ่มให้ (แก้ไม่ได้)
+      var gs = t.groups || [], mine = gs.filter(function (x) { return x.mine; })[0];
+      // dropdown: เห็นลำดับ+ชื่อทุกกลุ่ม แต่ดูสมาชิก/งานได้เฉพาะกลุ่มของตัวเอง
+      var dd = gs.length ? '<div class="field"><label for="gSel">กลุ่ม</label><select id="gSel">' + (mine ? '' : '<option value="">— คุณยังไม่มีกลุ่ม —</option>') +
+        gs.map(function (x) { return '<option value="' + x.groupNo + '"' + (x.mine ? ' selected' : '') + '>กลุ่ม ' + x.groupNo + (x.name ? ' · ' + esc(x.name) : '') + (x.mine ? ' (กลุ่มของคุณ)' : '') + '</option>'; }).join('') + '</select></div><div id="gOther" class="callout small" hidden></div>' : '';
+      if (!g) {
+        box.innerHTML = '<h3>กลุ่มของคุณ</h3>' + dd + '<div class="callout warn" id="noGroupFixed"><b>อาจารย์ยังไม่ได้จัดคุณเข้ากลุ่ม</b><br>งานนี้อาจารย์เป็นผู้จัดกลุ่ม — กด “แจ้งอาจารย์” ด้านล่างเพื่อให้จัดกลุ่มให้ก่อนจึงจะส่งงานได้</div>';
+        bindGSel(box, gs);
+        return;
+      }
+      box.innerHTML = '<div class="row sp"><h3>กลุ่มของคุณ</h3><span class="pill info">อาจารย์จัดให้</span></div>' + dd + '<div id="gMine"><p><b id="gName">' + esc(g.name) + '</b></p>' +
+        '<ul style="margin:0;padding-left:20px" id="gMembers">' + g.members.map(function (m) {
+          return '<li>' + esc(m.stdId) + ' — ' + esc(m.name) + (m.stdId === me().stdId ? ' <span class="pill">คุณ</span>' : '') + (g.rep && m.stdId === g.rep.stdId ? ' <span class="pill acc">ผู้ประสานงาน</span>' : '') + '</li>';
+        }).join('') + '</ul>' +
+        '<p class="small muted">สมาชิกทุกคนในกลุ่มดูงานที่ส่งและแก้ไขได้ (จนกว่างานปิดรับหรืออาจารย์ตรวจแล้ว)</p></div>';
+      bindGSel(box, gs);
+      return;
+    }
     if (!g) {
       box.innerHTML = '<h3>กลุ่มของคุณ</h3><p class="small muted">งานนี้ส่งเป็นกลุ่ม (สูงสุด ' + max + ' คน รวมตัวแทน) · คนที่สร้างกลุ่มจะเป็น <b>ตัวแทนส่งงาน</b> เลือกสมาชิกได้ครั้งเดียว — เพื่อนที่ถูกเลือกจะเห็นกลุ่มโดยอัตโนมัติ และจะอยู่ได้เพียงกลุ่มเดียว</p>' +
         (a.phase === 'closed' ? '<div class="callout bad">งานปิดรับแล้ว สร้างกลุ่มไม่ได้</div>' :
@@ -183,8 +233,8 @@
       return;
     }
     var h = '<div class="row sp"><h3>กลุ่ม: <span id="gName">' + esc(g.name) + '</span></h3>' + (g.isRep ? '<span class="pill acc">คุณเป็นตัวแทน</span>' : '<span class="pill">สมาชิก</span>') + '</div>' +
-      '<ul style="margin:0;padding-left:20px" id="gMembers">' + g.members.map(function (m) { return '<li>' + esc(m.stdId) + ' — ' + esc(m.name) + (m.stdId === g.rep.stdId ? ' <span class="pill acc">ตัวแทน</span>' : '') + '</li>'; }).join('') + '</ul>';
-    if (!g.isRep) h += '<p class="small muted">ตัวแทนกลุ่ม (' + esc(g.rep.name) + ') เป็นผู้ส่งงาน — คุณดูสถานะได้ที่หน้านี้</p>';
+      '<ul style="margin:0;padding-left:20px" id="gMembers">' + g.members.map(function (m) { return '<li>' + esc(m.stdId) + ' — ' + esc(m.name) + (g.rep && m.stdId === g.rep.stdId ? ' <span class="pill acc">ตัวแทน</span>' : '') + '</li>'; }).join('') + '</ul>';
+    h += '<p class="small muted">สมาชิกทุกคนในกลุ่มดูงานที่ส่งและแก้ไขได้' + (g.isRep ? '' : ' · เฉพาะตัวแทน' + (g.rep ? ' (' + esc(g.rep.name) + ')' : '') + 'ที่แก้รายชื่อสมาชิกได้') + '</p>';
     if (g.isRep && t.canEdit) {
       if (st.editGroup) {
         var cur = g.members.filter(function (m) { return m.stdId !== me().stdId; });
@@ -254,6 +304,12 @@
       return '<li class="small ' + (l.s === 'bad' ? 'err' : l.s === 'ok' ? '' : 'muted') + '">' + (l.s === 'ok' ? '✓ ' : l.s === 'bad' ? '✗ ' : l.s === 'run' ? '… ' : '· ') + esc(l.name) + (l.msg ? ' — ' + esc(l.msg) : '') + '</li>';
     }).join('') + '</ul>';
     if (a.requireFile && !files.length) h += '<div class="callout info small" id="needFile"><b>งานนี้ต้องแนบไฟล์</b> — กด “เลือกไฟล์ / ถ่ายรูป” อย่างน้อย 1 ไฟล์ จึงจะนับว่าส่งแล้ว</div>';
+    if (st.conflict) {
+      var cf = st.conflict;
+      h += '<div class="callout warn stack-s" id="conflict"><b>' + esc(cf.by || 'เพื่อนในกลุ่ม') + ' เพิ่งแก้ข้อความ/ลิงก์ของงานนี้' + (cf.at ? ' (' + esc(fmt(cf.at)) + ')' : '') + '</b> — ยังไม่ได้บันทึกของคุณ' +
+        '<div class="small">ของเพื่อน: ' + (cf.note ? '<span style="white-space:pre-wrap">' + esc(cf.note) + '</span>' : '<span class="muted">(ไม่มีข้อความ)</span>') + (cf.link ? '<br>ลิงก์: ' + esc(cf.link) : '') + '</div>' +
+        '<div class="row"><button class="btn sm" type="button" id="useTheirs">ใช้ของเพื่อน</button><button class="btn sm" type="button" id="keepMine">เก็บของฉัน (กดบันทึกอีกครั้งเพื่อทับ)</button></div></div>';
+    }
     h += '<div class="field"><label for="note">ข้อความถึงอาจารย์ (ไม่บังคับ)</label><textarea id="note" maxlength="2000" rows="3"' + (st.uploading ? ' disabled' : '') + '></textarea></div>' +
       '<div class="field"><label for="link">ลิงก์งาน เช่น Google Drive (ไม่บังคับ)</label><input id="link" type="url" inputmode="url" maxlength="500" autocomplete="off" placeholder="https://" ' + (st.uploading ? 'disabled' : '') + '></div>' +
       '<div class="err" id="nerr" role="alert"></div><button class="btn block" id="nsave" type="button"' + (st.uploading ? ' disabled' : '') + '>บันทึกข้อความ / ลิงก์</button>' +
@@ -264,6 +320,8 @@
     $('#link').addEventListener('input', function () { st.draft.link = this.value; });
     $('#pick').addEventListener('change', function () { var fs = Array.prototype.slice.call(this.files || []); this.value = ''; if (fs.length) addFiles(fs); });
     $('#nsave').addEventListener('click', saveNote);
+    if ($('#useTheirs')) $('#useTheirs').addEventListener('click', function () { st.draft.note = st.conflict.note || ''; st.draft.link = st.conflict.link || ''; st.conflict = null; renderSub(); });
+    if ($('#keepMine')) $('#keepMine').addEventListener('click', function () { st.conflict = null; renderSub(); });
     HBT.$$('[data-rm]', box).forEach(function (b) {
       b.addEventListener('click', function () {
         var id = b.getAttribute('data-rm');
@@ -286,10 +344,16 @@
     var link = st.draft.link.trim();
     if (link && !/^https?:\/\/\S{3,}$/i.test(link)) { err.textContent = 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://'; return; }
     HBT.busy(b, function () {
-      return S.call('stu.saveNote', { asgId: a.asgId, note: st.draft.note, link: link }).then(function (r) {
-        HBT.toast(r.saved ? 'บันทึกแล้ว' : 'ล้างข้อความแล้ว', 'good'); return loadTask();
+      return S.call('stu.saveNote', { asgId: a.asgId, note: st.draft.note, link: link, baseUpdatedAt: st.T.sub ? st.T.sub.updatedAt : '' }).then(function (r) {
+        st.conflict = null; HBT.toast(r.saved ? 'บันทึกแล้ว' : 'ล้างข้อความแล้ว', 'good'); return loadTask();
       });
-    }).catch(function (e) { if (e.code === 'E_ASG_FIELD') err.textContent = HBT.errMsg(e); else handleErr(e); });
+    }).catch(function (e) {
+      if (e.code === 'E_ASG_FIELD') { err.textContent = HBT.errMsg(e); return; }
+      if (e.code === 'E_ASG_CONFLICT') {                          // เพื่อนแก้ก่อน: เก็บข้อความที่พิมพ์ไว้ แสดงของเพื่อนให้เทียบ แล้วรีเฟรชข้อมูลล่าสุด (ฐานเวลาใหม่)
+        st.conflict = e.detail || {}; st.keepDraft = true; return loadTask();
+      }
+      handleErr(e);
+    });
   }
 
   function addFiles(list) {

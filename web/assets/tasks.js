@@ -53,7 +53,7 @@
 
   /* ---------- รายการงาน ---------- */
   function pillOf(t) {
-    if (t.needsGroup && t.phase !== 'closed') return '<span class="pill warn">ยังไม่มีกลุ่ม</span>';
+    if (t.needsGroup && t.phase !== 'closed') return '<span class="pill warn">' + (t.groupFixed ? 'อาจารย์ยังไม่ได้จัดกลุ่มให้' : 'ยังไม่มีกลุ่ม') + '</span>';
     if (t.graded) return '<span class="pill good">ตรวจแล้ว' + (t.score !== null ? ' · ' + esc(t.score) + '/' + esc(t.maxScore) : '') + '</span>';
     if (t.submitted) return '<span class="pill good">ส่งแล้ว</span>' + (t.late ? ' <span class="pill warn">ส่งช้า</span>' : '');
     if (t.phase === 'closed') return '<span class="pill bad">ไม่ได้ส่ง · ปิดรับแล้ว</span>';
@@ -85,7 +85,7 @@
       }
       function actionOf(t) {
         if (!isOpen(t)) return '<span class="arrow">' + (t.phase === 'closed' || t.graded ? 'ดูรายละเอียด' : 'เปิด') + ' ›</span>';
-        if (t.needsGroup) return '<span class="btn primary sm" data-go="' + esc(t.code) + '">สร้าง/เข้ากลุ่มก่อนส่ง ›</span>';
+        if (t.needsGroup) return t.groupFixed ? '<span class="arrow">ดูรายละเอียด ›</span>' : '<span class="btn primary sm" data-go="' + esc(t.code) + '">สร้าง/เข้ากลุ่มก่อนส่ง ›</span>';
         return '<span class="btn primary sm" data-go="' + esc(t.code) + '">' + (t.phase === 'late' ? 'ส่งงาน (รับช้า)' : 'ส่งงาน') + ' ›</span>';
       }
       app.innerHTML = head('<p class="muted" id="who">' + esc(s.course.code) + ' กลุ่ม ' + esc(s.course.section) + ' — ' + esc(s.course.name) + '<br><b>' + esc(r.me.name) + '</b> (' + esc(r.me.stdId) + ')</p>') +
@@ -97,8 +97,10 @@
             '<p class="small muted">' + (t.kind === 'group' ? 'งานกลุ่ม' : 'งานเดี่ยว') + (t.groupName ? ' · ' + esc(t.groupName) : '') + ' · เต็ม ' + esc(t.maxScore) +
             (t.dueAt ? ' · กำหนดส่ง ' + esc(fmt(t.dueAt)) : '') + (lt ? ' · <b>' + esc(lt) + '</b>' : '') + '</p>' + (t.submitted ? '<p class="small muted">ส่งล่าสุด ' + esc(fmt(t.updatedAt)) + '</p>' : '') + actionOf(t) + '</a>';
         }).join('') : '<div class="callout" id="noTasks">วิชานี้ยังไม่มีงาน</div>') + '</div>' +
+        '<section class="card stack-s" id="helpCard"><div class="row sp"><span class="small muted">มีเรื่องจะแจ้งอาจารย์ เช่น ติดปัญหาการส่งงาน หรือเพื่อนในกลุ่มไม่ช่วยงาน?</span><button class="btn sm" type="button" id="ibBtn">แจ้งอาจารย์</button></div></section>' +
         '<p class="small"><a href="#" id="bye">ออกจากระบบ</a></p>' + foot();
       $('#bye').addEventListener('click', function (e) { e.preventDefault(); S.clear(); pick(); });
+      $('#ibBtn').addEventListener('click', function () { S.inboxOpen({ me: r.me.stdId }); });
     }, function (e) {
       if (e.code === 'E_AUTH') { pick('หมดเวลาเข้าใช้งาน (2 ชั่วโมง) — เลือกวิชาและใส่ PIN อีกครั้ง'); return; }
       app.innerHTML = head() + '<div class="callout bad"><b>โหลดไม่สำเร็จ</b><br>' + esc(HBT.errMsg(e)) + '</div><div class="row"><button class="btn" id="retry" type="button">ลองใหม่</button></div>' + foot();

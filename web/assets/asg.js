@@ -16,8 +16,11 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
     '<div class="field"><label for="fT">ชื่องาน</label><input id="fT" type="text" maxlength="150" autocomplete="off"></div>' +
     '<div class="field"><label for="fD">รายละเอียด / คำสั่งงาน</label><textarea id="fD" rows="4" maxlength="4000"></textarea></div>' +
     '<div class="choice-row" role="radiogroup" aria-label="ประเภทงาน"><label class="choice"><input type="radio" name="fK" value="single" checked><span><b>งานเดี่ยว</b><br><span class="small muted">นักศึกษาส่งคนละชิ้น</span></span></label>' +
-    '<label class="choice"><input type="radio" name="fK" value="group"><span><b>งานกลุ่ม</b><br><span class="small muted">ตัวแทนสร้างกลุ่มและส่งแทน</span></span></label></div>' +
+    '<label class="choice"><input type="radio" name="fK" value="group"><span><b>งานกลุ่ม</b><br><span class="small muted">ส่งเป็นกลุ่ม สมาชิกทุกคนในกลุ่มส่ง/แก้งานได้</span></span></label></div>' +
     '<div class="err small" id="kNote"></div>' +
+    '<div class="stack-s" id="gmWrap" hidden><span class="lbl">การจัดกลุ่ม</span><div class="choice-row" role="radiogroup" aria-label="รูปแบบกลุ่ม">' +
+    '<label class="choice"><input type="radio" name="fGM" value="course"><span><b>ใช้กลุ่มที่จัดไว้</b><br><span class="small muted" id="gmCourseHelp">กลุ่มที่อาจารย์จัดในหน้า “นักศึกษา”</span></span></label>' +
+    '<label class="choice"><input type="radio" name="fGM" value="self" checked><span><b>ให้นักศึกษาจัดกลุ่มเอง</b><br><span class="small muted">ตัวแทนสร้างกลุ่ม เลือกเพื่อนจาก dropdown</span></span></label></div></div>' +
     '<div class="grid g2"><div class="field"><label for="fM">คะแนนเต็ม</label><input id="fM" type="number" inputmode="decimal" min="0.01" max="1000" step="any" value="10"></div>' +
     '<div class="field"><label for="fP">สัดส่วนที่เก็บ (% ของคะแนนรวมวิชา)</label><input id="fP" type="number" inputmode="decimal" min="0" max="100" step="any" value="0"><span class="help" id="fPh">ใส่ 0 = ยังไม่นับรวม · ตั้งหรือแก้ภายหลังที่หน้า คะแนน ได้</span></div></div>' +
     '<div class="grid g2"><div class="field" id="gWrap" hidden><label for="fG">สมาชิกกลุ่มสูงสุด (คน)</label><input id="fG" type="number" inputmode="numeric" min="1" max="30" step="1" value="5"></div></div>' +
@@ -113,8 +116,13 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
   function find(aid) { return data.assignments.filter(function (a) { return a.asgId === aid; })[0]; }
 
   function kindOf() { return (HBT.$('input[name=fK]:checked') || {}).value || 'single'; }
-  function syncKind() { $('#gWrap').hidden = kindOf() !== 'group'; }
+  function modeOf() { return (HBT.$('input[name=fGM]:checked') || {}).value || 'self'; }
+  function syncKind() {
+    var g = kindOf() === 'group';
+    $('#gmWrap').hidden = !g; $('#gWrap').hidden = !g || modeOf() === 'course';
+  }
   HBT.$$('input[name=fK]').forEach(function (r) { r.addEventListener('change', syncKind); });
+  HBT.$$('input[name=fGM]').forEach(function (r) { r.addEventListener('change', syncKind); });
 
   function openEdit(aid) {
     editing = aid ? find(aid) : null;
@@ -126,9 +134,12 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
     $('#fDue').value = a ? toInput(a.dueAt) : ''; $('#fClose').value = a ? toInput(a.closeAt) : '';
     $('#fLate').checked = a ? a.lateOk : false; $('#fShow').checked = a ? a.showGrades : false; $('#fReq').checked = a ? a.requireFile : true; $('#fL').value = a ? a.linkUrl : '';
     $('#fP').value = a ? a.pct : 0;
-    var used = a && (a.stats.submitted > 0 || a.stats.ungrouped < data.students && a.kind === 'group');
+    var used = a && (a.stats.submitted > 0 || (a.kind === 'group' && a.groupMode !== 'course' && a.stats.ungrouped < data.students));
+    var gm = a && a.kind === 'group' ? a.groupMode : (data.courseGroups ? 'course' : 'self');       // งานใหม่: มีกลุ่มที่จัดไว้แล้วก็เลือกแบบนั้นให้ก่อน
+    HBT.$$('input[name=fGM]').forEach(function (r) { r.checked = r.value === gm; r.disabled = !!used; });
     HBT.$$('input[name=fK]').forEach(function (r) { r.disabled = !!used; });
-    $('#kNote').textContent = used ? 'เปลี่ยนประเภทงานไม่ได้แล้ว เพราะมีการส่งงานหรือมีกลุ่มแล้ว' : '';
+    $('#gmCourseHelp').innerHTML = data.courseGroups ? 'มีกลุ่มที่จัดไว้ ' + data.courseGroups + ' กลุ่ม · สมาชิกทุกคนเห็นกลุ่มของตัวเองทันที' : 'ยังไม่มีกลุ่ม — <a href="' + root + 't/students.html?id=' + q + '">จัดกลุ่มที่หน้านักศึกษา</a>ก่อน';
+    $('#kNote').textContent = used ? 'เปลี่ยนประเภทงาน/รูปแบบกลุ่มไม่ได้แล้ว เพราะมีการส่งงานหรือมีกลุ่มแล้ว' : '';
     $('#eErr').textContent = ''; syncKind(); HBT.modal.open('mEdit');
   }
   $('#eSave').addEventListener('click', function () {
@@ -137,6 +148,8 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
       dueAt: fromInput($('#fDue').value), closeAt: fromInput($('#fClose').value), lateOk: $('#fLate').checked, showGrades: $('#fShow').checked, requireFile: $('#fReq').checked, pct: $('#fP').value.trim(), linkUrl: $('#fL').value.trim()
     };
     $('#eErr').textContent = '';
+    if (p.kind === 'group') p.groupMode = modeOf();
+    if (p.kind === 'group' && p.groupMode === 'course' && !data.courseGroups) { $('#eErr').textContent = 'ยังไม่มีกลุ่มที่จัดไว้ — จัดกลุ่มที่หน้า “นักศึกษา” ก่อน หรือเลือก “ให้นักศึกษาจัดกลุ่มเอง”'; return; }
     if (!p.title.trim()) { $('#eErr').textContent = 'กรุณากรอกชื่องาน'; return; }
     if (editing) p.asgId = editing.asgId; else p.courseId = id;
     HBT.busy(b, function () {
@@ -150,7 +163,7 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
   function openMsg(aid) {
     var a = find(aid), c = course;
     var url = studentUrl(a, a.code);
-    var t = 'งาน: ' + a.title + '\nวิชา: ' + c.code + ' กลุ่ม ' + c.section + ' ' + c.name + (a.kind === 'group' ? '\nประเภท: งานกลุ่ม (ตัวแทนสร้างกลุ่มและส่งแทน)' : '') +
+    var t = 'งาน: ' + a.title + '\nวิชา: ' + c.code + ' กลุ่ม ' + c.section + ' ' + c.name + (a.kind === 'group' ? (a.groupMode === 'course' ? '\nประเภท: งานกลุ่ม (อาจารย์จัดกลุ่มให้แล้ว — เปิดดูกลุ่มของตัวเองได้ สมาชิกส่งงานได้ทุกคน)' : '\nประเภท: งานกลุ่ม (ตัวแทนสร้างกลุ่ม สมาชิกส่งงานได้ทุกคน)') : '') +
       (a.dueAt ? '\nกำหนดส่ง: ' + fmt(a.dueAt) : '') + '\nรหัสงาน: ' + a.code + '\nส่งงานที่: ' + url + '\n(ใช้ชื่อ + PIN 4 หลักของคุณ)';
     $('#msgTxt').value = t; $('#msgOpen').setAttribute('href', url); HBT.modal.open('mMsg');
   }

@@ -18,8 +18,41 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     '<div class="row sp" id="toolbar" hidden>' +
     '<div class="row"><button class="btn" type="button" id="addBtn">เพิ่มนักศึกษา</button><button class="btn" type="button" id="impBtn">นำเข้า CSV</button>' +
     '<button class="btn primary" type="button" id="allBtn">ออกรหัสให้คนที่ยังไม่ตั้ง PIN</button></div></div>' +
-    '<div id="lkBar" hidden></div>' +
+    '<div class="row" id="tabs" role="tablist" hidden><button class="btn sm primary" type="button" role="tab" data-tab="list" id="tabList">รายชื่อ</button><button class="btn sm ghost" type="button" role="tab" data-tab="groups" id="tabGroups">กลุ่ม</button></div>' +
+    '<div id="lkBar" hidden></div><div class="row" id="gfBar" hidden></div>' +
     '<div id="listBox"><div class="loading"><span class="spin"></span> กำลังโหลด…</div></div>' +
+    '<div id="grpBox" class="stack" hidden></div>' +
+
+    /* ใส่เข้ากลุ่ม */
+    '<div class="modal" id="mGrp" hidden role="dialog" aria-modal="true" aria-labelledby="gTitle"><div class="mbox stack">' +
+    '<div class="row sp"><h2 id="gTitle">ใส่เข้ากลุ่ม</h2><button class="btn sm ghost" data-close type="button">ปิด</button></div>' +
+    '<p class="small" id="gSel"></p>' +
+    '<div class="field"><label for="gSelGroup">เลือกกลุ่ม</label><select id="gSelGroup"></select></div>' +
+    '<div class="field" id="gNewWrap" hidden><label for="gNewName">ชื่อกลุ่มใหม่ (ไม่บังคับ)</label><input id="gNewName" type="text" maxlength="60" autocomplete="off"><span class="help">ลำดับกลุ่มระบบเติมให้เอง</span></div>' +
+    '<div class="err" id="gErr" role="alert"></div>' +
+    '<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close type="button">ยกเลิก</button><button class="btn primary" type="button" id="gGo">ใส่เข้ากลุ่ม</button></div></div></div>' +
+
+    /* แบ่งกลุ่มอัตโนมัติ */
+    '<div class="modal" id="mAuto" hidden role="dialog" aria-modal="true" aria-labelledby="aTitle"><div class="mbox stack">' +
+    '<div class="row sp"><h2 id="aTitle">แบ่งกลุ่มอัตโนมัติ</h2><button class="btn sm ghost" data-close type="button">ปิด</button></div>' +
+    '<div class="field"><label for="aSize">จำนวนคนต่อกลุ่ม (ประมาณ)</label><input id="aSize" type="number" inputmode="numeric" min="1" max="100" step="1" value="5"><span class="help" id="aHelp"></span></div>' +
+    '<div class="stack-s"><span class="lbl">วิธีเรียงคน</span>' +
+    '<label class="check"><input type="radio" name="aOrder" value="id" checked><span>เรียงตามรหัสนักศึกษา</span></label>' +
+    '<label class="check"><input type="radio" name="aOrder" value="random"><span>สุ่ม</span></label></div>' +
+    '<div class="stack-s"><span class="lbl">ใครบ้าง</span>' +
+    '<label class="check"><input type="radio" name="aScope" value="ungrouped" checked><span><b>เฉพาะคนที่ยังไม่มีกลุ่ม</b><br><span class="small muted">กลุ่มที่จัดไว้แล้วไม่ถูกแตะ — สร้างกลุ่มใหม่ต่อท้าย</span></span></label>' +
+    '<label class="check"><input type="radio" name="aScope" value="all"><span><b>ทั้งห้อง (ล้างกลุ่มเดิมก่อน)</b><br><span class="small muted">ทำไม่ได้ถ้ามีกลุ่มที่ส่งงานแล้ว</span></span></label></div>' +
+    '<div class="err" id="aErr" role="alert"></div>' +
+    '<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close type="button">ยกเลิก</button><button class="btn primary" type="button" id="aGo">แบ่งกลุ่ม</button></div></div></div>' +
+
+    /* วางกลุ่มจาก Excel */
+    '<div class="modal" id="mGImp" hidden role="dialog" aria-modal="true" aria-labelledby="giTitle"><div class="mbox stack">' +
+    '<div class="row sp"><h2 id="giTitle">วางรายชื่อกลุ่มจาก Excel</h2><button class="btn sm ghost" data-close type="button">ปิด</button></div>' +
+    '<p class="small muted">คอลัมน์: <b>รหัสนักศึกษา · ลำดับกลุ่ม · ชื่อกลุ่ม (ไม่บังคับ)</b> — คัดลอกจาก Excel มาวางได้เลย (แถวหัวตารางข้ามให้) · กลุ่มที่ยังไม่มีระบบสร้างให้</p>' +
+    '<div class="field"><label for="giText">วางข้อมูลที่นี่</label><textarea id="giText" rows="7" spellcheck="false" placeholder="6601001&#9;1&#9;ทีมสตาร์ท"></textarea></div>' +
+    '<div id="giPrev"></div><div class="err" id="giErr" role="alert"></div>' +
+    '<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close type="button">ปิด</button>' +
+    '<button class="btn" type="button" id="giCheck">ตรวจสอบก่อน</button><button class="btn primary" type="button" id="giGo" disabled>ยืนยัน</button></div></div></div>' +
 
     /* เพิ่ม/แก้ไข */
     '<div class="modal" id="mStd" hidden role="dialog" aria-modal="true" aria-labelledby="sTitle"><div class="mbox stack">' +
@@ -60,10 +93,13 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     sorts: [
       { k: 'id', label: 'รหัสนักศึกษา', fn: function (s) { return s.stdId; } },
       { k: 'name', label: 'ชื่อ-นามสกุล', fn: function (s) { return s.name; } },
-      { k: 'pin', label: 'สถานะ PIN (ยังไม่ตั้งก่อน)', fn: function (s) { return s.resetRequested ? 0 : (PIN_ORD[s.pinStatus] === undefined ? 1 : PIN_ORD[s.pinStatus]); } }
+      { k: 'pin', label: 'สถานะ PIN (ยังไม่ตั้งก่อน)', fn: function (s) { return s.resetRequested ? 0 : (PIN_ORD[s.pinStatus] === undefined ? 1 : PIN_ORD[s.pinStatus]); } },
+      { k: 'group', label: 'กลุ่ม (ยังไม่มีกลุ่มท้ายสุด)', fn: function (s) { return s.groupNo || 100000; } }
     ],
     sort: 'id', noun: 'คน',
     bulk: [
+      { label: 'ใส่เข้ากลุ่ม…', cls: 'primary', run: function () { bulkGroup(); } },
+      { label: 'นำออกจากกลุ่ม', run: function () { bulkUngroup(); } },
       { label: 'ออกรหัสชั่วคราวที่เลือก', run: function () { bulkIssue(); } },
       { label: 'ลบที่เลือก', cls: 'danger', run: function () { bulkDelete(); } }
     ]
@@ -85,9 +121,29 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     document.title = 'นักศึกษา ' + c.code + ' — HBT Learning System';
   }
 
+  var tab = 'list', gf = 'all';          // แท็บที่เปิด · ตัวกรองกลุ่ม (all | none = ยังไม่มีกลุ่ม)
+  function gInfo(no) { return no ? (data.groups.filter(function (g) { return g.groupNo === no; })[0] || null) : null; }
+  function gLabel(no) { var g = gInfo(no); return g ? 'กลุ่ม ' + g.groupNo + (g.name ? ' · ' + g.name : '') : ''; }
+  function ungrouped() { return data.students.filter(function (s) { return !s.groupNo; }); }
+
+  function renderGf() {
+    var n = ungrouped().length, show = tab === 'list' && data.groups.length > 0 && data.students.length > 0;
+    $('#gfBar').hidden = !show;
+    if (!show) return;
+    $('#gfBar').innerHTML = '<span class="small muted">กลุ่ม:</span><button class="btn sm ' + (gf === 'all' ? 'primary' : 'ghost') + '" type="button" data-gf="all">ทั้งหมด</button>' +
+      '<button class="btn sm ' + (gf === 'none' ? 'primary' : 'ghost') + '" type="button" data-gf="none">ยังไม่มีกลุ่ม ' + n + ' คน</button>';
+  }
+  $('#gfBar').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-gf]'); if (!b) return;
+    gf = b.getAttribute('data-gf'); renderGf(); renderList();
+  });
+
   function renderList() {
-    $('#lkBar').hidden = !data.students.length;
-    var rows = kit.view(data.students);
+    $('#lkBar').hidden = tab !== 'list' || !data.students.length;
+    $('#listBox').hidden = tab !== 'list';
+    renderGf();
+    if (gf === 'none' && !ungrouped().length) gf = 'all';
+    var rows = kit.view(gf === 'none' ? ungrouped() : data.students);
     if (!data.students.length) {
       $('#listBox').innerHTML = '<div class="callout"><b>ยังไม่มีนักศึกษาในรายวิชานี้</b><br>กด “นำเข้า CSV” เพื่อนำเข้ารายชื่อทั้งห้อง หรือ “เพิ่มนักศึกษา” ทีละคน</div>';
       kit.update([], 0);
@@ -95,10 +151,11 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     }
     kit.update(rows, data.students.length);
     if (!rows.length) { $('#listBox').innerHTML = '<div class="callout">ไม่พบรายชื่อที่ตรงกับ “' + esc(kit.st.q) + '”</div>'; return; }
-    $('#listBox').innerHTML = '<div class="scroll"><table id="stdTable"><thead><tr><th class="lk-w"></th><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>PIN</th><th></th></tr></thead><tbody>' +
+    $('#listBox').innerHTML = '<div class="scroll"><table id="stdTable"><thead><tr><th class="lk-w"></th><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>กลุ่ม</th><th>PIN</th><th></th></tr></thead><tbody>' +
       rows.map(function (s) {
         var pl = PIN_LABEL[s.pinStatus] || PIN_LABEL.none;
         return '<tr data-std="' + esc(s.stdId) + '"' + (kit.st.sel[s.stdId] ? ' class="lk-on"' : '') + '><td class="lk-w">' + kit.cb(s, s.name) + '</td><td class="mono">' + esc(s.stdId) + '</td><td>' + esc(s.name) + '</td>' +
+          '<td>' + (s.groupNo ? '<span class="pill info">' + esc(gLabel(s.groupNo)) + '</span>' : '<span class="small muted">—</span>') + '</td>' +
           '<td><span class="pill ' + pl[1] + '">' + pl[0] + '</span>' + (s.resetRequested ? ' <span class="pill bad">ขอรีเซ็ต</span>' : '') + '</td>' +
           '<td><div class="tbl-actions"><button class="btn sm" type="button" data-act="edit">แก้ชื่อ</button>' +
           '<button class="btn sm" type="button" data-act="reset">' + (s.pinStatus === 'set' || s.pinStatus === 'temp' ? 'รีเซ็ต PIN' : 'ออกรหัส') + '</button>' +
@@ -109,7 +166,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
 
   function load() {
     return HBT.api.call('student.list', { courseId: id }).then(function (r) {
-      data = r; kit.prune(r.students); $('#toolbar').hidden = false; renderHead(); renderList();
+      data = r; kit.prune(r.students); $('#toolbar').hidden = tab !== 'list'; $('#tabs').hidden = !r.students.length; renderHead(); renderList(); renderGroups();
     }, function (e) {
       var nf = e.code === 'E_NOT_FOUND' || e.code === 'E_FORBIDDEN';
       $('#listBox').innerHTML = '<div class="callout bad"><b>' + (nf ? 'ไม่พบรายวิชานี้ หรือไม่มีสิทธิ์เข้าถึง' : 'โหลดรายชื่อไม่สำเร็จ') + '</b><br>' + esc(HBT.errMsg(e)) + '</div>' +
@@ -243,6 +300,160 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
       });
     }).catch(function (er) { HBT.toast(HBT.errMsg(er), 'bad'); });
   }
+
+  /* ---------- กลุ่ม (อาจารย์จัด) ---------- */
+  function setTab(t) {
+    tab = t;
+    $('#tabList').className = 'btn sm ' + (t === 'list' ? 'primary' : 'ghost');
+    $('#tabGroups').className = 'btn sm ' + (t === 'groups' ? 'primary' : 'ghost');
+    $('#tabList').setAttribute('aria-selected', t === 'list'); $('#tabGroups').setAttribute('aria-selected', t === 'groups');
+    $('#toolbar').hidden = t !== 'list'; $('#grpBox').hidden = t !== 'groups';
+    if (data) { renderList(); renderGroups(); }
+  }
+  $('#tabs').addEventListener('click', function (e) { var b = e.target.closest('[data-tab]'); if (b) setTab(b.getAttribute('data-tab')); });
+
+  function renderGroups() {
+    var box = $('#grpBox'); box.hidden = tab !== 'groups';
+    if (!data || tab !== 'groups') return;
+    var gs = data.groups, un = ungrouped();
+    var h = '<div class="row sp"><div class="row"><button class="btn primary" type="button" id="gNew">+ กลุ่มใหม่</button><button class="btn" type="button" id="gAuto">แบ่งกลุ่มอัตโนมัติ…</button><button class="btn" type="button" id="gImp">วางจาก Excel…</button></div>' +
+      '<span class="small muted" id="gSum">' + gs.length + ' กลุ่ม · ยังไม่มีกลุ่ม ' + un.length + ' คน</span></div>';
+    if (!gs.length) h += '<div class="callout" id="noGroups"><b>ยังไม่มีกลุ่ม</b><br>กด “+ กลุ่มใหม่” แล้วเพิ่มสมาชิก หรือ “แบ่งกลุ่มอัตโนมัติ” เพื่อแบ่งทั้งห้องในครั้งเดียว · หรือไปแท็บ “รายชื่อ” ติ๊กนักศึกษาหลายคนแล้วกด “ใส่เข้ากลุ่ม…”</div>';
+    gs.forEach(function (g) {
+      var mem = data.students.filter(function (s) { return s.groupNo === g.groupNo; });
+      h += '<div class="card stack-s" data-gno="' + g.groupNo + '">' +
+        '<div class="row sp"><div class="row"><b>กลุ่ม ' + g.groupNo + '</b><input class="gname" type="text" maxlength="60" placeholder="ชื่อกลุ่ม (ไม่บังคับ)" value="' + esc(g.name) + '" aria-label="ชื่อกลุ่ม ' + g.groupNo + '"><button class="btn sm" type="button" data-g="rename">บันทึกชื่อ</button></div>' +
+        '<div class="row"><span class="pill info">' + mem.length + ' คน</span><button class="btn sm ghost" type="button" data-g="del">ลบกลุ่ม</button></div></div>' +
+        '<div class="row" style="flex-wrap:wrap">' + (mem.length ? mem.map(function (s) {
+          var isRep = g.repStd === s.stdId;
+          return '<span class="pill' + (isRep ? ' acc' : '') + '" data-std="' + esc(s.stdId) + '">' + esc(s.name) + ' <span class="small mono">' + esc(s.stdId) + '</span> ' +
+            '<button class="btn sm ghost" type="button" data-g="rep" title="' + (isRep ? 'เอาออกจากตัวแทน' : 'ตั้งเป็นตัวแทน/ผู้ประสานงาน') + '" aria-label="' + (isRep ? 'เอา ' : 'ตั้ง ') + esc(s.name) + (isRep ? ' ออกจากตัวแทน' : ' เป็นตัวแทน') + '">' + (isRep ? '★' : '☆') + '</button>' +
+            '<button class="btn sm ghost" type="button" data-g="out" aria-label="นำ ' + esc(s.name) + ' ออกจากกลุ่ม">✕</button></span>';
+        }).join('') : '<span class="small muted">ยังไม่มีสมาชิก</span>') + '</div>' +
+        (un.length ? '<div class="row"><select class="gadd" aria-label="เพิ่มสมาชิกเข้ากลุ่ม ' + g.groupNo + '"><option value="">+ เพิ่มสมาชิก (เลือกจากคนที่ยังไม่มีกลุ่ม)…</option>' +
+          un.map(function (s) { return '<option value="' + esc(s.stdId) + '">' + esc(s.stdId + ' ' + s.name) + '</option>'; }).join('') + '</select></div>' : '') + '</div>';
+    });
+    box.innerHTML = h;
+  }
+  function gCall(action, args, okMsg, btn) {
+    var run = function () { return HBT.api.call(action, Object.assign({ courseId: id }, args), { write: true }).then(function (r) { if (okMsg) HBT.toast(okMsg, 'good'); return load().then(function () { return r; }); }); };
+    return (btn ? HBT.busy(btn, run) : run()).catch(function (er) { HBT.toast(HBT.errMsg(er), 'bad'); });
+  }
+  $('#grpBox').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'gNew') { gCall('group.save', {}, 'สร้างกลุ่มแล้ว', b); return; }
+    if (b.id === 'gAuto') { openAuto(); return; }
+    if (b.id === 'gImp') { openGImp(); return; }
+    var act = b.getAttribute('data-g'), card = b.closest('[data-gno]');
+    if (!act || !card) return;
+    var no = Number(card.getAttribute('data-gno')), pill = b.closest('[data-std]'), std = pill ? pill.getAttribute('data-std') : '';
+    if (act === 'rename') { gCall('group.save', { groupNo: no, name: card.querySelector('.gname').value }, 'บันทึกชื่อแล้ว', b); return; }
+    if (act === 'out') { gCall('group.unassign', { stdIds: [std] }, '', b); return; }
+    if (act === 'rep') { var g = gInfo(no); gCall('group.setRep', { groupNo: no, stdId: g && g.repStd === std ? '' : std }, '', b); return; }
+    if (act === 'del') {
+      var g2 = gInfo(no);
+      confirmBox('ลบกลุ่ม ' + no + (g2 && g2.name ? ' · ' + esc(g2.name) : '') + '?',
+        '<p>สมาชิก ' + (g2 ? g2.count : 0) + ' คนจะกลับเป็น “ยังไม่มีกลุ่ม” (ไม่ได้ลบนักศึกษา) · ถ้ากลุ่มนี้มีงานที่ส่งแล้ว ระบบไม่ให้ลบ</p>', 'ลบกลุ่ม', true, function () {
+          return HBT.api.call('group.delete', { courseId: id, groupNo: no }, { write: true }).then(function () { HBT.toast('ลบกลุ่มแล้ว', 'good'); return load(); });
+        });
+    }
+  });
+  $('#grpBox').addEventListener('change', function (e) {
+    var sl = e.target.closest('.gadd'); if (!sl || !sl.value) return;
+    var no = Number(sl.closest('[data-gno]').getAttribute('data-gno'));
+    gCall('group.assign', { stdIds: [sl.value], groupNo: no }, 'เพิ่มเข้ากลุ่มแล้ว');
+  });
+  $('#grpBox').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('gname')) { e.preventDefault(); var btn = e.target.closest('[data-gno]').querySelector('[data-g="rename"]'); if (btn) btn.click(); }
+  });
+
+  /* ใส่ที่เลือกเข้ากลุ่ม (จากแท็บรายชื่อ) */
+  var grpIds = [];
+  function nextGroupNo() { return data.groups.reduce(function (m, g) { return Math.max(m, g.groupNo); }, 0) + 1; }
+  function bulkGroup() {
+    var sel = kit.selected(data.students); if (!sel.length) return;
+    grpIds = sel.map(function (s) { return s.stdId; });
+    var moved = sel.filter(function (s) { return s.groupNo; }).length;
+    $('#gSel').innerHTML = 'นักศึกษาที่เลือก <b>' + sel.length + '</b> คน' + (moved ? ' — <span class="muted">' + moved + ' คนอยู่กลุ่มอื่นอยู่แล้ว จะถูกย้ายมากลุ่มนี้</span>' : '');
+    $('#gSelGroup').innerHTML = data.groups.map(function (g) { return '<option value="' + g.groupNo + '">' + esc(gLabel(g.groupNo)) + ' (' + g.count + ' คน)</option>'; }).join('') +
+      '<option value="new">+ กลุ่มใหม่ (ลำดับ ' + nextGroupNo() + ')</option>';
+    $('#gSelGroup').value = data.groups.length ? String(data.groups[data.groups.length - 1].groupNo) : 'new';
+    $('#gNewName').value = ''; $('#gNewWrap').hidden = $('#gSelGroup').value !== 'new'; $('#gErr').textContent = '';
+    HBT.modal.open('mGrp');
+  }
+  $('#gSelGroup').addEventListener('change', function () { $('#gNewWrap').hidden = this.value !== 'new'; });
+  $('#gGo').addEventListener('click', function () {
+    var b = this, v = $('#gSelGroup').value, args = { courseId: id, stdIds: grpIds };
+    if (v === 'new') args.newGroup = { name: $('#gNewName').value }; else args.groupNo = Number(v);
+    $('#gErr').textContent = '';
+    HBT.busy(b, function () {
+      return HBT.api.call('group.assign', args, { write: true }).then(function (r) {
+        HBT.modal.close('mGrp'); kit.clear(); HBT.toast('ใส่เข้ากลุ่ม ' + r.groupNo + ' แล้ว ' + r.moved + ' คน', 'good'); return load();
+      });
+    }).catch(function (er) { $('#gErr').textContent = HBT.errMsg(er); });
+  });
+  function bulkUngroup() {
+    var sel = kit.selected(data.students).filter(function (s) { return s.groupNo; });
+    if (!sel.length) { HBT.toast('คนที่เลือกยังไม่มีกลุ่มอยู่แล้ว', 'warn'); return; }
+    gCall('group.unassign', { stdIds: sel.map(function (s) { return s.stdId; }) }, 'นำออกจากกลุ่มแล้ว ' + sel.length + ' คน', $('#lkBar').querySelector('[data-lk-bulk="1"]')).then(function () { kit.clear(); renderList(); });
+  }
+
+  /* แบ่งกลุ่มอัตโนมัติ */
+  function aScope() { return HBT.$$('input[name=aScope]').filter(function (r) { return r.checked; })[0].value; }
+  function aHelp() {
+    var n = aScope() === 'all' ? data.students.length : ungrouped().length, sz = Number($('#aSize').value) || 0;
+    $('#aHelp').textContent = sz >= 1 ? 'จะแบ่ง ' + n + ' คน ได้ประมาณ ' + Math.ceil(n / sz) + ' กลุ่ม' : '';
+  }
+  function openAuto() {
+    $('#aErr').textContent = ''; HBT.$$('input[name=aScope]')[0].checked = true; HBT.$$('input[name=aOrder]')[0].checked = true; aHelp();
+    HBT.modal.open('mAuto');
+  }
+  $('#aSize').addEventListener('input', aHelp);
+  HBT.$$('input[name=aScope]').forEach(function (r) { r.addEventListener('change', aHelp); });
+  $('#aGo').addEventListener('click', function () {
+    var b = this, order = HBT.$$('input[name=aOrder]').filter(function (r) { return r.checked; })[0].value, scope = aScope();
+    $('#aErr').textContent = '';
+    if (scope === 'all' && data.groups.length && !window.confirm('ล้างกลุ่มเดิมทั้งหมดแล้วแบ่งใหม่ทั้งห้อง?')) return;
+    HBT.busy(b, function () {
+      return HBT.api.call('group.auto', { courseId: id, size: $('#aSize').value, order: order, scope: scope }, { write: true }).then(function (r) {
+        HBT.modal.close('mAuto'); HBT.toast('แบ่งแล้ว ' + r.groups + ' กลุ่ม (' + r.students + ' คน)', 'good'); return load();
+      });
+    }).catch(function (er) { $('#aErr').textContent = HBT.errMsg(er); });
+  });
+
+  /* วางจาก Excel: รหัส · ลำดับกลุ่ม · ชื่อกลุ่ม */
+  var giPrev = null;
+  function parseGroupRows(text) {
+    var rows = [];
+    String(text || '').split(/\r?\n/).forEach(function (line) {
+      if (!line.trim()) return;
+      var p = (line.indexOf('\t') >= 0 ? line.split('\t') : line.split(',')).map(function (x) { return x.trim().replace(/^"|"$/g, ''); });
+      if (!rows.length && p.length > 1 && !/^\d+$/.test(p[1])) return;                 // แถวหัวตาราง
+      rows.push({ stdId: p[0] || '', groupNo: p[1] || '', name: p[2] || '' });
+    });
+    return rows;
+  }
+  function openGImp() { $('#giText').value = ''; $('#giPrev').innerHTML = ''; $('#giErr').textContent = ''; $('#giGo').disabled = true; giPrev = null; HBT.modal.open('mGImp'); }
+  $('#giText').addEventListener('input', function () { giPrev = null; $('#giPrev').innerHTML = ''; $('#giGo').disabled = true; $('#giErr').textContent = ''; });
+  function giHtml(p, real) {
+    return '<div class="callout" id="giSum"><b>' + (real ? 'บันทึกแล้ว' : 'ผลการตรวจสอบ (ยังไม่บันทึก)') + '</b><br>จัดเข้ากลุ่ม <b>' + p.assigned + '</b> คน · สร้างกลุ่มใหม่ <b>' + p.created + '</b> · แก้ชื่อกลุ่ม <b>' + p.renamed + '</b>' + (p.skippedCount ? ' · ข้าม <b>' + p.skippedCount + '</b> แถว' : '') + '</div>' +
+      (p.skippedCount ? '<details open><summary class="small">แถวที่ข้าม</summary><ul class="small">' + p.skipped.slice(0, 50).map(function (x) { return '<li>แถว ' + x.row + (x.stdId ? ' (' + esc(x.stdId) + ')' : '') + ': ' + esc(x.why) + '</li>'; }).join('') + '</ul></details>' : '');
+  }
+  $('#giCheck').addEventListener('click', function () {
+    var b = this, rows = parseGroupRows($('#giText').value); $('#giErr').textContent = '';
+    if (!rows.length) { $('#giErr').textContent = 'ยังไม่มีข้อมูล — วางจาก Excel ก่อน'; return; }
+    HBT.busy(b, function () {
+      return HBT.api.call('group.import', { courseId: id, rows: rows, dryRun: true }).then(function (p) { giPrev = rows; $('#giPrev').innerHTML = giHtml(p, false); $('#giGo').disabled = !p.assigned; if (!p.assigned) $('#giErr').textContent = 'ไม่มีแถวที่ใช้ได้'; });
+    }).catch(function (er) { $('#giErr').textContent = HBT.errMsg(er); });
+  });
+  $('#giGo').addEventListener('click', function () {
+    var b = this; if (!giPrev) return;
+    HBT.busy(b, function () {
+      return HBT.api.call('group.import', { courseId: id, rows: giPrev }, { write: true }).then(function (p) {
+        $('#giPrev').innerHTML = giHtml(p, true); $('#giGo').disabled = true; giPrev = null; HBT.toast('จัดกลุ่มแล้ว', 'good'); return load();
+      });
+    }).catch(function (er) { $('#giErr').textContent = HBT.errMsg(er); });
+  });
 
   /* ---------- นำเข้า CSV ---------- */
   function mode() { return HBT.$$('input[name=iMode]').filter(function (r) { return r.checked; })[0].value; }

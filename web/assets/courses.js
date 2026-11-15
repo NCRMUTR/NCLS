@@ -33,7 +33,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     }
     $('#listBox').innerHTML = '<div class="grid g2" id="courseGrid">' + r.courses.map(function (c) {
       return '<a class="card link-card" data-id="' + esc(c.courseId) + '" href="' + root + 't/course.html?id=' + encodeURIComponent(c.courseId) + '">' +
-        '<div class="row sp"><h3>' + esc(c.code) + ' <span class="muted">กลุ่ม ' + esc(c.section) + '</span></h3><span class="pill info">' + c.students + ' คน</span></div>' +
+        '<div class="row sp"><h3>' + esc(c.code) + ' <span class="muted">กลุ่ม ' + esc(c.section) + '</span></h3><span class="row"><span class="pill info">' + c.students + ' คน</span>' + (c.inboxNew ? '<span class="pill bad" title="ข้อความใหม่จากนักศึกษา">ข้อความใหม่ ' + c.inboxNew + '</span>' : '') + '</span></div>' +
         '<p>' + esc(c.name) + '</p>' +
         (all && c.ownerEmail !== ctx.user.email ? '<p class="xs muted">เจ้าของ: ' + esc(c.ownerEmail) + '</p>' : '') +
         '<span class="arrow">เปิดรายวิชา ›</span></a>';

@@ -82,6 +82,9 @@ var Assignments = (function () {
     return !!(f || sub.note || sub.link);
   }
 
+  /** งานกลุ่มที่ใช้กลุ่มที่อาจารย์จัดไว้ (group_mode = 'course') */
+  function isCourseMode_(a) { return a.kind === 'group' && a.group_mode === 'course'; }
+
   /** หน่วยงาน: เดี่ยว = นักศึกษา 1 คน · กลุ่ม = 1 กลุ่ม  (+ รายชื่อคนที่ยังไม่มีกลุ่ม) */
   function units_(a, L) {
     var asgId = a.asg_id, subs = L.subs[asgId] || {}, files = L.files[asgId] || {}, out = [], ungrouped = [];
@@ -91,6 +94,18 @@ var Assignments = (function () {
         out.push({ subKey: k, groupId: '', name: st.name, rep: st.std_id, members: [st.std_id], sub: subs[k] || null, files: files[k] || [] });
       });
       return { units: out, ungrouped: ungrouped };
+    }
+    if (isCourseMode_(a)) {                                  // ใช้กลุ่มที่อาจารย์จัดไว้ (Students.group_no) — ไม่มี AsgGroups/AsgMembers
+      var sn = Groups.snapshot(a.course_id);
+      sn.groups.forEach(function (g) {
+        if (!g.members.length) return;
+        var gid = Groups.gid(g.no), k = key_(asgId, gid);
+        out.push({
+          subKey: k, groupId: gid, groupNo: g.no, name: 'กลุ่ม ' + g.no + (g.name ? ' · ' + g.name : ''), rep: g.rep || '',
+          members: g.members.map(function (m) { return m.stdId; }), sub: subs[k] || null, files: files[k] || []
+        });
+      });
+      return { units: out, ungrouped: sn.ungrouped.slice() };
     }
     var inGroup = {}, byGroup = {};
     (L.members[asgId] || []).forEach(function (m) { inGroup[m.std_id] = true; (byGroup[m.group_id] = byGroup[m.group_id] || []).push(m.std_id); });
@@ -147,7 +162,7 @@ var Assignments = (function () {
       asgId: a.asg_id, courseId: a.course_id, code: a.code, title: a.title, description: a.description, kind: a.kind,
       maxScore: Number(a.max_score), dueAt: a.due_at, lateOk: U.bool(a.late_ok), closeAt: a.close_at, status: a.status,
       phase: phase_(a, Date.now()), maxGroup: Number(a.max_group) || 5, showGrades: U.bool(a.show_grades), linkUrl: a.link_url,
-      requireFile: needFile_(a),
+      requireFile: needFile_(a), groupMode: a.kind === 'group' ? (a.group_mode === 'course' ? 'course' : 'self') : '',
       createdAt: a.created_at, updatedAt: a.updated_at
     };
   }
@@ -177,7 +192,8 @@ var Assignments = (function () {
     var rows = Db.findRows('Assignments', 'course_id', c.course_id).sort(function (x, y) { return x.created_at < y.created_at ? 1 : -1; }).map(function (r) {
       var o = asgOut_(r); o.stats = statsOf_(r, L); o.pct = pm[r.asg_id] || 0; return o;
     });
-    return { assignments: rows, students: L.roster.length, tid: Courses.tidOf(c.owner_email) };
+    var cg = Groups.snapshot(c.course_id).groups.filter(function (g) { return g.members.length > 0; }).length;
+    return { assignments: rows, students: L.roster.length, tid: Courses.tidOf(c.owner_email), courseGroups: cg };
   }
 
   function get(user, a) {
@@ -196,6 +212,12 @@ var Assignments = (function () {
     var desc = clip_(a.description !== undefined ? a.description : (ex ? ex.description : ''), 4000);
     var kind = a.kind !== undefined ? String(a.kind) : (ex ? ex.kind : 'single');
     if (KINDS.indexOf(kind) < 0) throw U.E('E_ASG_FIELD', { field: 'kind' }, 'ประเภทงานต้องเป็น เดี่ยว หรือ กลุ่ม');
+    var oldMode = ex ? (ex.kind === 'group' ? (ex.group_mode === 'course' ? 'course' : 'self') : '') : '';
+    var gm = kind !== 'group' ? '' : (a.groupMode !== undefined ? (String(a.groupMode) === 'course' ? 'course' : 'self') : (oldMode || 'self'));
+    if (gm === 'course' && gm !== oldMode) {
+      var cgs = Groups.snapshot(ex ? ex.course_id : c.course_id).groups;
+      if (!cgs.some(function (g) { return g.members.length > 0; })) throw U.E('E_ASG_FIELD', { field: 'groupMode' }, 'ยังไม่มีกลุ่มที่จัดไว้ในวิชานี้ — จัดกลุ่มที่หน้า “นักศึกษา” ก่อน');
+    }
     var maxScore = a.maxScore !== undefined && a.maxScore !== '' ? Number(a.maxScore) : (ex ? Number(ex.max_score) : 10);
     if (isNaN(maxScore) || maxScore <= 0 || maxScore > 1000) throw U.E('E_ASG_FIELD', { field: 'maxScore' }, 'คะแนนเต็มต้องเป็นตัวเลข 0.01–1000');
     maxScore = r2_(maxScore);
@@ -221,7 +243,7 @@ var Assignments = (function () {
       Db.insert('Assignments', {
         asg_id: id, course_id: c.course_id, code: code, title: title, description: desc, kind: kind, max_score: maxScore, due_at: dueAt,
         late_ok: U.bstr(lateOk), close_at: closeAt, status: 'open', max_group: maxGroup, show_grades: U.bstr(showGrades), link_url: link,
-        folder_id: folder.getId(), created_by: user.email, created_at: now, updated_at: now, require_file: U.bstr(requireFile)
+        folder_id: folder.getId(), created_by: user.email, created_at: now, updated_at: now, require_file: U.bstr(requireFile), group_mode: gm
       });
       Scores.ensureType(c.course_id, 'ASSIGN', id, { name: title, max: maxScore, pct: pct || 0 });
       Courses.touch(c.course_id);
@@ -230,7 +252,7 @@ var Assignments = (function () {
     }
 
     var L = load_(ex.course_id);
-    if (kind !== ex.kind) {
+    if (kind !== ex.kind || gm !== oldMode) {
       var us = units_(ex, L);
       var used = us.units.some(function (u) { return hasContent_(u.sub, u.files); }) || (L.members[ex.asg_id] || []).length || Object.keys(L.groups[ex.asg_id] || {}).length;
       if (used) throw U.E('E_ASG_KIND_LOCKED');
@@ -241,7 +263,7 @@ var Assignments = (function () {
     }
     Db.update('Assignments', ex.asg_id, {
       title: title, description: desc, kind: kind, max_score: maxScore, due_at: dueAt, late_ok: U.bstr(lateOk), close_at: closeAt,
-      max_group: maxGroup, show_grades: U.bstr(showGrades), link_url: link, updated_at: now, require_file: U.bstr(requireFile)
+      max_group: maxGroup, show_grades: U.bstr(showGrades), link_url: link, updated_at: now, require_file: U.bstr(requireFile), group_mode: gm
     });
     Scores.updateAuto(ex.course_id, 'ASSIGN', ex.asg_id, { name: title, max: maxScore });
     if (pct !== null) { Scores.ensureType(ex.course_id, 'ASSIGN', ex.asg_id, { name: title, max: maxScore }); Scores.setAutoPct(ex.course_id, 'ASSIGN', ex.asg_id, pct); }
@@ -267,6 +289,8 @@ var Assignments = (function () {
     Db.removeWhere('AsgGrades', function (o) { return o.asg_id === r.asg_id; });
     Db.removeWhere('AsgMembers', function (o) { return o.asg_id === r.asg_id; });
     Db.removeWhere('AsgGroups', function (o) { return o.asg_id === r.asg_id; });
+    Db.removeWhere('AsgSubLog', function (o) { return o.asg_id === r.asg_id; });
+    Inbox.dropAsg(r.asg_id);
     var sc = Scores.removeAuto(r.course_id, 'ASSIGN', r.asg_id);
     Db.remove('Assignments', r.asg_id);
     trashFolder_(r.folder_id);
@@ -280,7 +304,7 @@ var Assignments = (function () {
     var units = u.units.map(function (x) {
       var has = hasContent_(x.sub, x.files, r);
       return {
-        subKey: x.subKey, groupId: x.groupId, name: x.name, rep: x.groupId ? { stdId: x.rep, name: nameOf_(L, x.rep) } : null,
+        subKey: x.subKey, groupId: x.groupId, groupNo: x.groupNo || null, name: x.name, rep: x.groupId && x.rep ? { stdId: x.rep, name: nameOf_(L, x.rep) } : null,
         members: x.members.map(function (s) {
           var g = (L.grades[r.asg_id] || {})[s];
           return { stdId: s, name: nameOf_(L, s), score: g && g.score !== '' ? Number(g.score) : null, feedback: g ? g.feedback : '' };
@@ -290,6 +314,16 @@ var Assignments = (function () {
       };
     });
     var ao = asgOut_(r); ao.pct = Scores.pctMap(r.course_id, 'ASSIGN')[r.asg_id] || 0;
+    if (r.kind === 'group') {                                       // ประวัติการแก้ + ข้อความที่นักศึกษาแจ้งเกี่ยวกับกลุ่ม/งานนี้
+      var logs = {}, reps = {};
+      Db.findRows('AsgSubLog', 'asg_id', r.asg_id).forEach(function (x) { (logs[x.sub_key] = logs[x.sub_key] || []).push(x); });
+      Inbox.forAsg(r.asg_id, r.course_id).forEach(function (m) { if (m.aboutStd) (reps[m.aboutStd] = reps[m.aboutStd] || []).push(m); });
+      units.forEach(function (x) {
+        var hh = histOut_(logs[x.subKey] || [], L);
+        x.history = hh.history; x.historyTruncated = hh.truncated; x.firstBy = hh.firstBy; x.lastBy = hh.lastBy;
+        x.members.forEach(function (m) { m.reports = (reps[m.stdId] || []).map(function (q) { return { msgId: q.msgId, from: nameOf_(L, q.fromStd), message: q.message, at: q.createdAt, status: q.status }; }); });
+      });
+    }
     return { assignment: ao, units: units, ungrouped: u.ungrouped, stats: statsOf_(r, L) };
   }
 
@@ -369,7 +403,7 @@ var Assignments = (function () {
       return {
         asgId: a.asg_id, code: a.code, title: a.title, kind: a.kind, maxScore: Number(a.max_score), dueAt: a.due_at, closeAt: a.close_at,
         lateOk: U.bool(a.late_ok), phase: phase_(a, Date.now()), submitted: !!has, updatedAt: has ? u.sub.updated_at : '', late: has ? isLate_(a, u.sub.updated_at) : false,
-        needsGroup: a.kind === 'group' && !u, groupName: a.kind === 'group' && u ? u.name : '',
+        needsGroup: a.kind === 'group' && !u, groupName: a.kind === 'group' && u ? u.name : '', groupFixed: isCourseMode_(a),
         graded: !!g, score: g && show ? Number(g.score) : null
       };
     });
@@ -380,8 +414,7 @@ var Assignments = (function () {
     var ph = phase_(a, Date.now());
     if (ph === 'closed') return { ok: false, code: 'E_ASG_CLOSED' };
     if (a.kind === 'group') {
-      if (!u) return { ok: false, code: 'E_ASG_NO_GROUP' };
-      if (u.rep !== std) return { ok: false, code: 'E_ASG_NOT_REP' };
+      if (!u) return { ok: false, code: 'E_ASG_NO_GROUP' };        // สมาชิกทุกคนในกลุ่มแก้งานที่ส่งได้ (ไม่ใช่เฉพาะตัวแทน)
     }
     if (u && anyGraded_(L, a.asg_id, u)) return { ok: false, code: 'E_ASG_GRADED' };
     return { ok: true };
@@ -402,9 +435,21 @@ var Assignments = (function () {
     if (r.kind === 'group') {
       if (u) {
         out.group = {
-          groupId: u.groupId, name: u.name, rep: { stdId: u.rep, name: nameOf_(L, u.rep) }, isRep: u.rep === s.stdId,
+          groupId: u.groupId, groupNo: u.groupNo || null, name: u.name, rep: u.rep ? { stdId: u.rep, name: nameOf_(L, u.rep) } : null, isRep: u.rep === s.stdId,
           members: u.members.map(function (m) { return { stdId: m, name: nameOf_(L, m) }; })
         };
+      }
+      if (u) {
+        var hh = histOut_(Db.findRows('AsgSubLog', 'sub_key', u.subKey), L);
+        out.history = hh.history; out.historyTruncated = hh.truncated;
+        if (out.sub) { out.sub.firstBy = hh.firstBy; out.sub.lastBy = hh.lastBy; }
+      }
+      if (isCourseMode_(r)) {                                       // อาจารย์จัดกลุ่มให้ — ไม่มีผู้สมัครเข้ากลุ่ม · dropdown: เห็นลำดับ+ชื่อทุกกลุ่ม แต่ดูงาน/สมาชิกได้เฉพาะกลุ่มตัวเอง
+        out.fixed = true;
+        out.groups = Groups.snapshot(r.course_id).groups.filter(function (g) { return g.members.length > 0; }).map(function (g) {
+          return { groupNo: g.no, name: g.name, count: g.members.length, mine: !!(u && u.groupNo === g.no) };
+        });
+        return out;
       }
       var ug = units_(r, L).ungrouped;
       // ตัวแทน (หรือคนที่ยังไม่มีกลุ่ม) เลือกสมาชิกจากคนที่ยังว่างอยู่
@@ -417,6 +462,7 @@ var Assignments = (function () {
   function stuGroupSave(s, a) {
     var r = asgOfStudent_(s, a.asgId);
     if (r.kind !== 'group') throw U.E('E_ASG_NOT_GROUP');
+    if (isCourseMode_(r)) throw U.E('E_ASG_GROUP_FIXED');
     if (phase_(r, Date.now()) === 'closed') throw U.E('E_ASG_CLOSED');
     var L = load_(s.courseId), mine = myUnit_(r, s.stdId, L);
     if (mine && mine.rep !== s.stdId) throw U.E('E_ASG_NOT_REP');
@@ -456,6 +502,7 @@ var Assignments = (function () {
   function stuGroupDelete(s, a) {
     var r = asgOfStudent_(s, a.asgId);
     if (r.kind !== 'group') throw U.E('E_ASG_NOT_GROUP');
+    if (isCourseMode_(r)) throw U.E('E_ASG_GROUP_FIXED');
     var L = load_(s.courseId), u = myUnit_(r, s.stdId, L);
     if (!u) throw U.E('E_ASG_NO_GROUP');
     if (u.rep !== s.stdId) throw U.E('E_ASG_NOT_REP');
@@ -500,6 +547,30 @@ var Assignments = (function () {
     }, patch));
   }
 
+  /* ---------- ประวัติการแก้งานกลุ่ม ---------- */
+  var HIST_MAX = 100;
+  /** เขียนประวัติ (เฉพาะงานกลุ่ม): ใครทำอะไรเมื่อไร */
+  function log_(ctx, s, action, detail) {
+    if (ctx.a.kind !== 'group') return;
+    Db.insert('AsgSubLog', {
+      log_id: U.uid('LOG'), sub_key: ctx.subKey, asg_id: ctx.a.asg_id, course_id: ctx.a.course_id, std_id: s.stdId,
+      at: U.nowIso(), action: action, detail: oneLine_(detail, 200)
+    });
+  }
+  function histOut_(rows, L) {
+    var h = rows.slice().sort(function (x, y) { return x.at < y.at ? -1 : (x.at > y.at ? 1 : 0); }).map(function (r) {
+      return { stdId: r.std_id, name: nameOf_(L, r.std_id), at: r.at, action: r.action, detail: r.detail };
+    });
+    var cut = h.length > HIST_MAX;
+    if (cut) h = [h[0]].concat(h.slice(h.length - (HIST_MAX - 1)));
+    return { history: h, truncated: cut, firstBy: h.length ? { stdId: h[0].stdId, name: h[0].name, at: h[0].at } : null, lastBy: h.length ? { stdId: h[h.length - 1].stdId, name: h[h.length - 1].name, at: h[h.length - 1].at } : null };
+  }
+  function lastLog_(subKey) {
+    var rows = Db.findRows('AsgSubLog', 'sub_key', subKey), best = null;
+    rows.forEach(function (r) { if (!best || r.at >= best.at) best = r; });
+    return best;
+  }
+
   /** อัปโหลด 1 ไฟล์  a = { asgId, name, b64 } → เพิ่มเข้างานที่ส่ง */
   function stuUpload(s, a) {
     var lim = limits_(), pre = editCtx_(s, a.asgId);                         // 1) ตรวจสิทธิ์/เฟส ก่อนแตะไฟล์
@@ -536,6 +607,7 @@ var Assignments = (function () {
           file_id: id, sub_key: ctx.subKey, asg_id: ctx.a.asg_id, course_id: ctx.a.course_id, name: name, size: bytes.length,
           mime: TYPES[ext].mime, drive_id: file.getId(), uploaded_at: now, uploaded_by: s.stdId
         });
+        log_(ctx, s, 'upload', name);
         Audit.log(s.stdId + '@' + s.courseId, 'asg.upload', ctx.a.asg_id, { file: id, size: bytes.length });
         return { fileId: id, name: name, size: bytes.length, uploadedAt: now };
       }, 30000);
@@ -549,6 +621,7 @@ var Assignments = (function () {
     if (f.sub_key !== ctx.subKey) throw U.E('E_FORBIDDEN');
     trashFile_(f.drive_id);
     Db.remove('AsgFiles', f.file_id);
+    log_(ctx, s, 'remove', f.name);
     var sub = Db.byId('AsgSubs', ctx.subKey);
     if (sub && !sub.note && !sub.link && !Db.findRows('AsgFiles', 'sub_key', ctx.subKey).length) Db.remove('AsgSubs', ctx.subKey);
     Audit.log(s.stdId + '@' + s.courseId, 'asg.removeFile', f.asg_id, { file: f.file_id });
@@ -560,11 +633,18 @@ var Assignments = (function () {
     var note = clip_(a.note, 2000).trim(), link = oneLine_(a.link, 500);
     if (link && !/^https?:\/\/[^\s]{3,}$/i.test(link)) throw U.E('E_ASG_FIELD', { field: 'link' }, 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://');
     var hasFiles = Db.findRows('AsgFiles', 'sub_key', ctx.subKey).length > 0;
+    var cur = Db.byId('AsgSubs', ctx.subKey);
+    if (ctx.a.kind === 'group' && cur && a.baseUpdatedAt !== undefined && String(a.baseUpdatedAt) !== String(cur.updated_at)) {
+      var last = lastLog_(ctx.subKey);                                      // เพื่อนในกลุ่มแก้หลังจากที่คนนี้เปิดหน้านี้ → ไม่ทับเงียบๆ (ถ้าเป็นการแก้ของตัวเองไม่ถือว่าชน)
+      if (last && last.std_id !== s.stdId) throw U.E('E_ASG_CONFLICT', { by: nameOf_(ctx.L, last.std_id), at: last.at, note: cur.note, link: cur.link });
+    }
     if (!note && !link && !hasFiles) {
-      if (Db.byId('AsgSubs', ctx.subKey)) Db.remove('AsgSubs', ctx.subKey);
+      if (cur) { Db.remove('AsgSubs', ctx.subKey); log_(ctx, s, 'note', 'ล้างข้อความ/ลิงก์'); }
       return { saved: false };
     }
+    var changed = !cur || cur.note !== note || cur.link !== link;
     upsertSub_(ctx, s, { note: note, link: link });
+    if (changed) log_(ctx, s, 'note', note || link ? (note ? 'แก้ข้อความ' : '') + (note && link ? ' + ' : '') + (link ? 'แก้ลิงก์' : '') : '');
     Audit.log(s.stdId + '@' + s.courseId, 'asg.note', ctx.a.asg_id, '');
     return { saved: true, updatedAt: Db.byId('AsgSubs', ctx.subKey).updated_at };
   }
@@ -588,6 +668,7 @@ var Assignments = (function () {
       Db.remove('AsgSubs', r.sub_key); n++;
     });
     n += Db.removeWhere('AsgGrades', function (o) { return o.course_id === courseId && set[o.std_id] === true; });
+    Db.removeWhere('AsgSubLog', function (o) { return o.course_id === courseId && set[o.std_id] === true; });
     // กลุ่ม: เอาออกจากสมาชิก · ถ้าตัวแทนถูกลบ ให้สมาชิกคนอื่นรับช่วง · ถ้าไม่เหลือใครลบกลุ่ม+งานที่ส่ง
     var gone = Db.findRows('AsgMembers', 'course_id', courseId).filter(function (m) { return set[m.std_id]; });
     var touched = {}; gone.forEach(function (m) { touched[m.group_id] = true; });
@@ -599,6 +680,7 @@ var Assignments = (function () {
         var sk = key_(g.asg_id, gid);
         Db.findRows('AsgFiles', 'sub_key', sk).forEach(function (f) { trashFile_(f.drive_id); });
         Db.removeWhere('AsgFiles', function (o) { return o.sub_key === sk; });
+        Db.removeWhere('AsgSubLog', function (o) { return o.sub_key === sk; });
         if (Db.byId('AsgSubs', sk)) Db.remove('AsgSubs', sk);
         Db.remove('AsgGroups', gid);
       } else if (set[g.rep_std]) {

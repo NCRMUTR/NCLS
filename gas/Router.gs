@@ -135,6 +135,15 @@ var ROUTES = {
     auth: 'user', write: true,
     fn: function (a, u) { return Students.removeMany(u, a); }
   },
+  /* ---------- กลุ่มนักศึกษา (อาจารย์จัด) ---------- */
+  'group.list':     { auth: 'user', fn: function (a, u) { return Groups.list(u, a); } },
+  'group.save':     { auth: 'user', write: true, fn: function (a, u) { return Groups.save(u, a); } },
+  'group.assign':   { auth: 'user', write: true, fn: function (a, u) { return Groups.assign(u, a); } },
+  'group.unassign': { auth: 'user', write: true, fn: function (a, u) { return Groups.unassign(u, a); } },
+  'group.delete':   { auth: 'user', write: true, fn: function (a, u) { return Groups.remove(u, a); } },
+  'group.setRep':   { auth: 'user', write: true, fn: function (a, u) { return Groups.setRep(u, a); } },
+  'group.import':   { auth: 'user', write: true, fn: function (a, u) { return Groups.importRows(u, a); } },
+  'group.auto':     { auth: 'user', write: true, fn: function (a, u) { return Groups.auto(u, a); } },
   'pin.issueTemp': {
     auth: 'user', write: true,
     fn: function (a, u) { return Pin.issueTemp(u, a); }
@@ -165,6 +174,10 @@ var ROUTES = {
     auth: 'user',
     fn: function (a, u) { return Scores.exportCsv(u, a.courseId); }
   },
+  'score.summary':    { auth: 'user', fn: function (a, u) { return Scores.summary(u, a.courseId); } },
+  'score.override':   { auth: 'user', write: true, fn: function (a, u) { return Scores.override(u, a); } },
+  'score.adjust':     { auth: 'user', write: true, fn: function (a, u) { return Scores.adjust(u, a); } },
+  'score.gradeScale': { auth: 'user', write: true, fn: function (a, u) { return Scores.gradeScale(u, a); } },
 
   /* ---------- เช็คชื่อ (อาจารย์: ต้องมีสิทธิ์ระบบ att) ---------- */
   'att.open':         { auth: { system: 'att' }, write: true, fn: function (a, u) { return Attendance.open(u, a); } },
@@ -233,6 +246,11 @@ var ROUTES = {
   'stu.upload':      { auth: 'student', big: true, fn: function (a, s) { return Assignments.stuUpload(s, a); } },
   'stu.removeFile':  { auth: 'student', lock: true, fn: function (a, s) { return Assignments.stuRemoveFile(s, a); } },
   'stu.saveNote':    { auth: 'student', lock: true, fn: function (a, s) { return Assignments.stuSaveNote(s, a); } },
+  'stu.inboxSend':   { auth: 'student', lock: true, fn: function (a, s) { return Inbox.send(s, a); } },
+  'stu.inboxMine':   { auth: 'student', fn: function (a, s) { return Inbox.mine(s); } },
+  'inbox.list':      { auth: 'user', fn: function (a, u) { return Inbox.list(u, a); } },
+  'inbox.mark':      { auth: 'user', write: true, fn: function (a, u) { return Inbox.mark(u, a); } },
+  'inbox.delete':    { auth: 'user', write: true, fn: function (a, u) { return Inbox.remove(u, a); } },
   'stu.groupSave':   { auth: 'student', lock: true, fn: function (a, s) { return Assignments.stuGroupSave(s, a); } },
   'stu.groupDelete': { auth: 'student', lock: true, fn: function (a, s) { return Assignments.stuGroupDelete(s, a); } },
   /* ---------- สำรอง (เจ้าของวิชา/admin) · รีเซ็ต (admin) ---------- */

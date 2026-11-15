@@ -163,7 +163,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
   function render() {
     var c = tb.course;
     $('#head').innerHTML = '<div class="page-h"><div class="stack-s"><h1>คะแนน</h1><p>' + esc(c.code) + ' กลุ่ม ' + esc(c.section) + ' · ' + esc(c.name) + '</p></div>' +
-      '<div class="row"><a class="btn sm" id="backCourse" href="' + root + 't/course.html?id=' + encodeURIComponent(id) + '">‹ กลับรายวิชา</a></div></div>';
+      '<div class="row"><a class="btn sm" id="goSummary" href="' + root + 't/summary.html?id=' + encodeURIComponent(id) + '">สรุปคะแนน / เกรด</a><a class="btn sm" id="backCourse" href="' + root + 't/course.html?id=' + encodeURIComponent(id) + '">‹ กลับรายวิชา</a></div></div>';
     document.title = 'คะแนน ' + c.code + ' — HBT Learning System';
     $('#box').innerHTML = '<div class="stack">' + renderBar() + renderSel() + renderTypes() + renderGrid() + '</div>';
     refreshDirty();

@@ -252,3 +252,10 @@ details>summary{cursor:pointer}
 .lk-all{white-space:nowrap}
 tr.lk-on td,.card.lk-on{background:var(--accent-soft,var(--surface2))}
 th.lk-w,td.lk-w{width:36px;text-align:center}
+
+/* สรุปคะแนน: ช่องที่คลิกแก้ได้ · ช่องที่อาจารย์แก้ทับ */
+.sm-cell{border:0;background:transparent;font:inherit;color:inherit;cursor:pointer;min-width:44px;min-height:32px;padding:4px 8px;border-radius:8px;text-align:right}
+.sm-cell:hover{background:var(--accent-soft)}
+.sm-cell.lk{background:var(--warn-soft);color:var(--warn);font-weight:600}
+.gr{font-size:1.02rem}
+tr.tfoot td{background:var(--surface2);font-size:.86rem}

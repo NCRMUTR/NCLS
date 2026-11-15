@@ -411,7 +411,7 @@ test('ตัวแทนสร้างกลุ่ม: เลือกสมา
   assert.strictEqual(ok(G(s, 1, a.asgId, [2, 3], 'ทีมสาม')).members, 3);
   const t1 = ok(s.api(tok(s, 2), 'stu.task', { asgId: a.asgId }));
   assert.strictEqual(t1.group.name, 'ทีมสาม'); assert.strictEqual(t1.group.isRep, false); assert.strictEqual(t1.group.members.length, 3); assert.strictEqual(t1.group.rep.stdId, std(1));
-  assert.strictEqual(t1.canEdit, false); assert.strictEqual(t1.whyNot, 'E_ASG_NOT_REP'); assert.strictEqual(t1.candidates.length, 0);
+  assert.strictEqual(t1.canEdit, true, 'สมาชิกทุกคนส่ง/แก้งานกลุ่มได้'); assert.strictEqual(t1.whyNot, ''); assert.strictEqual(t1.candidates.length, 0, 'แต่แก้รายชื่อสมาชิกได้เฉพาะตัวแทน');
   const t2 = ok(s.api(tok(s, 1), 'stu.task', { asgId: a.asgId }));
   assert.strictEqual(t2.group.isRep, true); assert.strictEqual(t2.canEdit, true); assert.deepStrictEqual(t2.candidates.map(x => x.stdId), [std(4), std(5), std(6)]);
   assert.strictEqual(ok(s.api(tok(s, 4), 'stu.task', { asgId: a.asgId })).candidates.length, 2, 'คนว่างเลือกเพื่อนตั้งกลุ่มเองได้ (ไม่รวมคนที่มีกลุ่ม)');
@@ -460,13 +460,12 @@ test('ลบกลุ่ม: เฉพาะตัวแทน · ถ้าม�
   assert.strictEqual(s.rows('AsgGroups').length, 0); assert.strictEqual(s.rows('AsgMembers').length, 0);
   ok(G(s, 2, a.asgId, [1]));
 });
-test('ส่งงานกลุ่ม: เฉพาะตัวแทน · งานเก็บใต้กลุ่ม · สมาชิกเห็นไฟล์เดียวกัน · อาจารย์เห็น 1 หน่วยพร้อมสมาชิกทุกคน · ไม่มีกลุ่มส่งไม่ได้', () => {
+test('ส่งงานกลุ่ม: ทุกคนในกลุ่มแก้ได้ · งานเก็บใต้กลุ่ม · สมาชิกเห็นไฟล์เดียวกัน · อาจารย์เห็น 1 หน่วยพร้อมสมาชิกทุกคน · ไม่มีกลุ่มส่งไม่ได้', () => {
   const s = world(5); const a = mkAsg(s, { kind: 'group' });
   assert.strictEqual(code(up(s, 1, a.asgId, 'a.pdf')), 'E_ASG_NO_GROUP');
   ok(G(s, 1, a.asgId, [2, 3]));
-  assert.strictEqual(code(up(s, 2, a.asgId, 'a.pdf')), 'E_ASG_NOT_REP');
-  assert.strictEqual(code(s.api(tok(s, 2), 'stu.saveNote', { asgId: a.asgId, note: 'x' })), 'E_ASG_NOT_REP');
-  ok(up(s, 1, a.asgId, 'a.pdf')); ok(s.api(tok(s, 1), 'stu.saveNote', { asgId: a.asgId, note: 'ของกลุ่ม' }));
+  assert.strictEqual(code(up(s, 4, a.asgId, 'a.pdf')), 'E_ASG_NO_GROUP', 'คนนอกกลุ่มส่งไม่ได้');
+  ok(up(s, 2, a.asgId, 'a.pdf')); ok(s.api(tok(s, 1), 'stu.saveNote', { asgId: a.asgId, note: 'ของกลุ่ม' }));   // สมาชิกอัปโหลด · ตัวแทนเขียนข้อความ (ทุกคนในกลุ่มแก้ได้)
   const t2 = ok(s.api(tok(s, 2), 'stu.task', { asgId: a.asgId })); assert.strictEqual(t2.sub.files.length, 1); assert.strictEqual(t2.sub.note, 'ของกลุ่ม');
   assert.strictEqual(ok(s.api(tok(s, 2), 'stu.tasks', {})).tasks[0].submitted, true);
   assert.strictEqual(ok(s.api(tok(s, 4), 'stu.tasks', {})).tasks[0].submitted, false);
