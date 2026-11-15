@@ -336,8 +336,9 @@ var Attendance = (function () {
     // PIN: เครื่องใหม่ของนักศึกษาคนนี้ต้องยืนยัน PIN (ตั้ง PIN ครั้งแรกได้ที่นี่)
     // (ตั้งค่า att_require_pin = 0 → ข้ามทั้งหมด: ไม่ถาม PIN และไม่ให้ตั้ง PIN ตอนเช็คชื่อ)
     var mode = '', pk = Pin.key(s.course_id, std);       // PIN/เครื่องที่ยืนยันแล้ว แยกตามภาคเรียน
+    var trustedList = trustedDevices_(pk);
+    var trusted = trustedList.some(function (t) { return t.device_id === dev; });
     if (Settings.get('att_require_pin') !== '0') {
-      var trusted = trustedDevices_(pk).some(function (t) { return t.device_id === dev; });
       var pst = Pin.status(pk);
       if (pst === 'set') { if (!trusted) mode = 'enter'; }
       else mode = (pst === 'temp') ? 'temp' : 'set';
@@ -380,7 +381,7 @@ var Attendance = (function () {
       });
       if (!own) Db.insert('AttDevices', { dev_key: sid + '|' + dev, session_id: sid, course_id: cur.course_id, device_id: dev, std_id: std, at: now });
       if (approval) Db.update('AttApprovals', approval.req_id, { status: 'used' });
-      rememberDevice_(pk, dev, now);
+      if (!trusted) rememberDevice_(pk, dev, now, trustedList);       // เครื่องที่จำไว้แล้วไม่ต้องแตะชีตอีก (ลดงานใน lock)
       return { status: status, name: student.name, already: false, pinJustSet: pinJustSet };
     }, 30000);
   }
@@ -393,10 +394,10 @@ var Attendance = (function () {
     return hit;
   }
 
-  function rememberDevice_(std, dev, now) {
+  function rememberDevice_(std, dev, now, known) {
     var key = std + '|' + dev, ex = Db.byId('StudentDevices', key);
     if (ex) { Db.update('StudentDevices', key, { last_at: now }); return; }
-    var list = trustedDevices_(std).sort(function (x, y) { return x.last_at < y.last_at ? -1 : 1; });
+    var list = (known || trustedDevices_(std)).slice().sort(function (x, y) { return x.last_at < y.last_at ? -1 : 1; });
     while (list.length >= MAX_TRUSTED) { Db.remove('StudentDevices', list.shift().dev_key); }
     Db.insert('StudentDevices', { dev_key: key, std_id: std, device_id: dev, first_at: now, last_at: now });
   }
@@ -450,6 +451,14 @@ var Attendance = (function () {
       var o = sessionOut_(s, false); o.checkIns = counts[s.session_id] || 0; return o;
     }).sort(function (x, y) { return (y.startAt || y.openedAt) < (x.startAt || x.openedAt) ? -1 : 1; });
     return { sessions: list };
+  }
+
+  /** หน้าเช็คชื่อ: ข้อมูลทั้งหมดในคำขอเดียว (ใช้ชีต/แคชร่วมกัน ไม่อ่านซ้ำ) */
+  function page(user, a) {
+    var course = Courses.get(user, a.courseId);
+    var settings = {};
+    Settings.getAll().forEach(function (d) { if (d.group === 'เช็คชื่อ') settings[d.key] = d.value; });
+    return { course: course, session: current(user, a).session, sessions: sessionsList(user, a).sessions, settings: settings };
   }
 
   function report(user, a) {
@@ -613,7 +622,7 @@ var Attendance = (function () {
   return {
     open: open, pause: pause, resume: resume, close: close, current: current, live: live, decide: decide,
     info: info, checkIn: checkIn, requestOverride: requestOverride, approvalStatus: approvalStatus,
-    sessionsList: sessionsList, report: report, studentDetail: studentDetail, exportCsv: exportCsv,
+    sessionsList: sessionsList, page: page, report: report, studentDetail: studentDetail, exportCsv: exportCsv,
     setStatus: setStatus, importRows: importRows, deleteSession: deleteSession, deleteEmpty: deleteEmpty,
     forgetDevices: forgetDevices, countForStudent: countForStudent, removeForStudents: removeForStudents,
     syncScores: syncScores_, sweep: sweep_, phase: phase_

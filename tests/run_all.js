@@ -5,7 +5,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 const jobs = [
-  ['core_test.js'], ['core_test2.js'], ['core_test3.js'], ['core_test4.js'], ['core_test5.js'], ['core_test6.js'], ['core_test7.js'], ['web_test.js'],
+  ['core_test.js'], ['core_test2.js'], ['core_test3.js'], ['core_test4.js'], ['core_test5.js'], ['core_test6.js'], ['core_test7.js'], ['web_test.js'], ['core_perf_test.js'],
   ['load_order.js', '../gas', '100'], ['load_order.js', '../exam', '100']
 ];
 let bad = 0;

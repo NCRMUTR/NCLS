@@ -72,11 +72,11 @@ function makeEnv(state, srcDir) {
     getMaxColumns() { return this.maxCols; } insertColumnsAfter(a, n) { this.maxCols += n; }
     getMaxRows() { return this.maxRows; } insertRowsAfter(a, n) { this.maxRows += n; }
     getLastColumn() { let m = 0; this.data.forEach(r => { for (let i = r.length - 1; i >= 0; i--) if (r[i] !== '' && r[i] !== undefined) { m = Math.max(m, i + 1); break; } }); return m; }
-    getLastRow() { for (let i = this.data.length - 1; i >= 0; i--) if (this.data[i].some(v => v !== '' && v !== undefined && v !== null)) return i + 1; return 0; }
+    getLastRow() { state.ops++; for (let i = this.data.length - 1; i >= 0; i--) if (this.data[i].some(v => v !== '' && v !== undefined && v !== null)) return i + 1; return 0; }
     getRange(r, c, nr, nc) { return new Range(this, r, c, nr, nc); }
     getFrozenRows() { return this.frozen; } setFrozenRows(n) { this.frozen = n; }
     setColumnWidth() {}
-    appendRow(vals) { state.ops++; const r = this.getLastRow(); while (this.data.length <= r) this.data.push([]); this.data[r] = vals.slice(); }
+    appendRow(vals) { state.ops++; let r = 0; for (let i = this.data.length - 1; i >= 0; i--) if (this.data[i].some(v => v !== "" && v !== undefined && v !== null)) { r = i + 1; break; } while (this.data.length <= r) this.data.push([]); this.data[r] = vals.slice(); }
     deleteRow(r) { this.data.splice(r - 1, 1); }
     deleteRows(r, n) { this.data.splice(r - 1, n); }
   }
@@ -84,7 +84,7 @@ function makeEnv(state, srcDir) {
     constructor() { this.id = 'SS' + crypto.randomBytes(8).toString('hex') + 'xxxxxxxxxxxx'; }
     getId() { return this.id; }
     setSpreadsheetTimeZone() {}
-    getSheetByName(n) { return state.sheets[n] || null; }
+    getSheetByName(n) { state.ops++; return state.sheets[n] || null; }
     insertSheet(n) { const s = new Sheet(n); state.sheets[n] = s; state.order.push(n); return s; }
     getSheets() { return state.order.map(n => state.sheets[n]); }
     deleteSheet(s) { delete state.sheets[s.name]; state.order = state.order.filter(n => n !== s.name); }

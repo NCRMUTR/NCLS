@@ -290,12 +290,8 @@ HBT.page({ active: 'att', need: 'att', crumbs: [['รายวิชาของ
   });
 
   function load() {
-    return Promise.all([
-      HBT.api.call('course.get', { courseId: id }),
-      HBT.api.call('att.current', { courseId: id }),
-      HBT.api.call('att.sessions', { courseId: id }),
-      HBT.api.call('settings.get').then(function (r) { var m = {}; (r.settings || []).forEach(function (s) { m[s.key] = s.value; }); return m; }, function () { return {}; })
-    ]).then(function (r) { course = r[0]; cur = r[1].session; sessions = r[2].sessions; kit.prune(sessions); defs = r[3] || {}; render(); }, function (e) {
+    return HBT.api.call('att.page', { courseId: id })
+      .then(function (r) { course = r.course; cur = r.session; sessions = r.sessions; kit.prune(sessions); defs = r.settings || {}; render(); }, function (e) {
       var nf = e.code === 'E_NOT_FOUND' || e.code === 'E_FORBIDDEN';
       $('#box').innerHTML = '<div class="callout bad"><b>' + (nf ? 'ไม่พบรายวิชานี้ หรือไม่มีสิทธิ์เข้าถึง' : 'โหลดไม่สำเร็จ') + '</b><br>' + esc(HBT.errMsg(e)) + '</div>' +
         '<div class="row" style="margin-top:10px">' + (nf ? '' : '<button class="btn" type="button" id="reload">ลองใหม่</button>') + '<a class="btn" href="' + root + 't/courses.html">รายวิชาของฉัน</a></div>';

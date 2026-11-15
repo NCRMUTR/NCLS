@@ -1,11 +1,11 @@
-/* HBT Core — หน้านักศึกษา: เช็คชื่อ (ไม่ต้องล็อกอิน) · เลือกชื่อ + GPS + PIN เมื่อใช้เครื่องใหม่ · ขออนุมัติเมื่อเครื่องชน */
+/* HBT Core — หน้านักศึกษา: เช็คชื่อ (ไม่ต้องล็อกอิน) · กรอกรหัสนักศึกษา (ระบบเทียบกับรายชื่อวิชาแล้วแสดงชื่อในสรุป) + GPS + PIN เมื่อใช้เครื่องใหม่ · ขออนุมัติเมื่อเครื่องชน */
 (function () {
   'use strict';
   var esc = HBT.esc, $ = HBT.$, root = HBT.api.root();
   var app = document.getElementById('app');
   var sid = HBT.qs('s');
   var LBL = { normal: 'ปกติ', late: 'สาย', leave: 'ลา' };
-  var st = { info: null, students: [], std: '', mode: '', busy: false, pos: null, posAt: 0, req: null, poll: null, tickT: null, fetchedAt: 0 };
+  var st = { info: null, std: '', mode: '', busy: false, pos: null, posAt: 0, req: null, poll: null, tickT: null, fetchedAt: 0 };
 
   if (!HBT.api.configuredCore()) {
     app.innerHTML = '<div class="callout warn"><b>ยังไม่ได้ตั้งค่าเว็บ</b><br>ไฟล์ assets/config.js ยังไม่มี CORE_URL</div>';
@@ -37,7 +37,6 @@
   function head() {
     return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Learning System</a><h1>เช็คชื่อเข้าเรียน</h1></div>';
   }
-  function opt(v, t) { return '<option value="' + esc(v) + '">' + esc(t) + '</option>'; }
   function mmss(sec) { sec = Math.max(0, Math.round(sec)); return (sec < 600 ? '0' : '') + Math.floor(sec / 60) + ':' + (sec % 60 < 10 ? '0' : '') + (sec % 60); }
 
   /* ---------- หน้าจอ ---------- */
@@ -47,8 +46,8 @@
       '<p class="muted" id="crs">' + esc(i.course.code) + ' กลุ่ม ' + esc(i.course.section) + ' — ' + esc(i.course.name) + '</p>' +
       '<div class="callout" id="stBanner" role="status"></div>' +
       '<section class="card stack" id="form">' +
-      '<div class="field"><label for="fq">ค้นหารหัสหรือชื่อของคุณ</label><input id="fq" type="search" autocomplete="off" placeholder="พิมพ์รหัสหรือชื่อ"></div>' +
-      '<div class="field"><label for="selS">ชื่อของคุณ</label><select id="selS"><option value="">กำลังโหลด…</option></select></div>' +
+      '<div class="field"><label for="stdId">รหัสนักศึกษา 13 หลัก</label><input id="stdId" type="text" inputmode="numeric" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" placeholder="กรอกรหัสนักศึกษาของคุณ">' +
+      '<span class="help">ระบบจะตรวจรหัสกับรายชื่อของวิชานี้ และแสดงชื่อของคุณหลังเช็คชื่อสำเร็จ</span></div>' +
       '<div id="pinBox" class="stack" hidden></div>' +
       '<div class="err" id="err" role="alert"></div>' +
       '<div id="conflict" class="callout warn stack-s" hidden></div>' +
@@ -58,14 +57,12 @@
       '<div id="done" class="callout good stack-s" hidden role="status"></div>' +
       '<p class="small muted">ยังไม่เคยตั้ง PIN หรือลืม PIN? <a href="' + root + 's/pin.html">ตั้ง / เปลี่ยน PIN</a> · <a href="' + root + 's/home.html">กลับหน้าแรก</a></p>';
     banner();
-    $('#fq').addEventListener('input', fill);
-    $('#selS').addEventListener('change', onStd);
+    var inp = $('#stdId');
+    inp.addEventListener('input', function () { inp.value = inp.value.replace(/[^A-Za-z0-9\-]/g, '').toUpperCase().slice(0, 20); onStd(); });
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     $('#go').addEventListener('click', function () { submit(); });
-    HBT.api.call('pub.students', { courseId: i.course.courseId }).then(function (r) {
-      st.students = r.students; fill();
-      var last = lastStd(i.course.courseId);
-      if (last && st.students.some(function (s) { return s.stdId === last; })) { $('#selS').value = last; onStd(); }
-    }, function (e) { $('#err').textContent = HBT.errMsg(e); $('#selS').innerHTML = opt('', 'โหลดรายชื่อไม่สำเร็จ'); });
+    var last = lastStd(i.course.courseId);
+    if (last) { inp.value = last; onStd(); }
   }
 
   function banner() {
@@ -83,18 +80,9 @@
     return HBT.api.call('att.info', { sessionId: sid }).then(function (i) { st.info = i; st.fetchedAt = Date.now(); banner(); });
   }
 
-  function fill() {
-    var q = $('#fq').value.trim().toLowerCase();
-    var list = st.students.filter(function (s) { return !q || s.stdId.toLowerCase().indexOf(q) >= 0 || s.name.toLowerCase().indexOf(q) >= 0; });
-    var cur = $('#selS').value;
-    $('#selS').innerHTML = opt('', list.length ? '— เลือกชื่อของคุณ (' + list.length + ') —' : 'ไม่พบรายชื่อที่ค้นหา') +
-      list.map(function (s) { return opt(s.stdId, s.stdId + ' — ' + s.name); }).join('');
-    if (cur && list.some(function (s) { return s.stdId === cur; })) $('#selS').value = cur;
-    else if (list.length === 1 && q) $('#selS').value = list[0].stdId;
-    onStd();
-  }
+  function normStd(v) { return String(v || '').replace(/[\s\u200b]/g, '').toUpperCase(); }
   function onStd() {
-    var v = $('#selS').value;
+    var v = normStd($('#stdId').value);
     if (v !== st.std) { st.std = v; setMode(''); cancelReq(); $('#err').textContent = ''; $('#done').hidden = true; $('#conflict').hidden = true; }
   }
 
@@ -137,9 +125,9 @@
     function go() {
       n++;
       return HBT.api.call(action, args).catch(function (e) {
-        if ((e.code === 'E_BUSY' || e.code === 'E_NETWORK') && n < 5) {
-          $('#err').textContent = 'กำลังรอคิว… (ครั้งที่ ' + (n + 1) + ')';
-          return sleep(900 + Math.random() * 1600).then(go);
+        if ((e.code === 'E_BUSY' || e.code === 'E_NETWORK') && n < 8) {
+          $('#err').textContent = 'กำลังรอคิว… (ครั้งที่ ' + (n + 1) + ') — ห้องเช็คชื่อพร้อมกันหลายคน อย่าปิดหน้านี้';
+          return sleep(900 * Math.min(n, 4) + Math.random() * 2000).then(go);
         }
         throw e;
       });
@@ -152,7 +140,9 @@
   function submit() {
     if (st.busy) return;
     var err = $('#err'); err.textContent = ''; $('#conflict').hidden = true;
-    if (!st.std) { err.textContent = 'เลือกชื่อของคุณก่อน'; return; }
+    st.std = normStd($('#stdId').value);
+    if (!st.std) { err.textContent = 'กรอกรหัสนักศึกษาของคุณก่อน'; $('#stdId').focus(); return; }
+    if (!/^[A-Za-z0-9\-]{4,20}$/.test(st.std)) { err.textContent = 'รหัสนักศึกษาไม่ถูกต้อง — ตรวจสอบรหัสแล้วกรอกใหม่'; $('#stdId').focus(); return; }
     var a = { sessionId: sid, stdId: st.std, deviceId: deviceId() };
     var v = function (id) { var e = $('#' + id); return e ? e.value : ''; };
     var chk = function (x) { return /^\d{4}$/.test(x); };
@@ -178,7 +168,7 @@
     cancelReq(); lastStd(st.info.course.courseId, st.std);
     $('#form').hidden = true; $('#stBanner').hidden = true;
     var d = $('#done'); d.hidden = false;
-    d.innerHTML = '<h2 id="okTitle">' + (r.already ? 'คุณเช็คชื่อไว้แล้ว' : 'เช็คชื่อสำเร็จ') + '</h2><p><b>' + esc(r.name) + '</b></p>' +
+    d.innerHTML = '<h2 id="okTitle">' + (r.already ? 'คุณเช็คชื่อไว้แล้ว' : 'เช็คชื่อสำเร็จ') + '</h2><p><b>' + esc(r.name) + '</b><br><span class="mono small muted">รหัส ' + esc(st.std) + '</span></p>' +
       '<p>สถานะ: <span class="pill ' + (r.status === 'late' ? 'warn' : 'good') + '" id="okStatus">' + esc(LBL[r.status] || r.status) + '</span></p>' +
       (r.pinJustSet ? '<p class="small"><b>ตั้ง PIN แล้ว</b> — จำไว้ ใช้ยืนยันตัวตนเมื่อเปลี่ยนเครื่อง</p>' : '') +
       '<p class="small muted">ปิดหน้านี้ได้เลย · ถ้าสถานะไม่ถูกต้อง แจ้งอาจารย์</p>';
@@ -201,6 +191,10 @@
       var d = e.detail || {};
       err.textContent = 'คุณอยู่นอกพื้นที่ห้องเรียน (ห่างประมาณ ' + d.distance + ' ม. ต้องไม่เกิน ' + d.radius + ' ม.) — เข้าใกล้ห้องเรียนหรือรอสัญญาณ GPS นิ่งแล้วกดอีกครั้ง';
       st.pos = null; return;
+    }
+    if (c === 'E_NOT_FOUND') {                         // รหัสไม่อยู่ในรายชื่อวิชานี้ (หรือรูปแบบผิด)
+      err.textContent = 'ไม่พบรหัสนักศึกษา ' + st.std + ' ในรายวิชานี้ — ตรวจสอบรหัสว่ากรอกถูกต้อง (ไม่เว้นวรรค ครบทุกหลัก) แล้วกรอกใหม่ · ถ้ารหัสถูกแล้วแต่ยังไม่พบ แจ้งอาจารย์ให้เพิ่มรายชื่อ';
+      $('#stdId').focus(); return;
     }
     if (c === 'E_ATT_CLOSED' || c === 'E_ATT_PAUSED') { err.textContent = HBT.errMsg(e); reloadInfo(); return; }
     if (c === 'E_GPS') { err.textContent = e.message; return; }

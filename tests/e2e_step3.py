@@ -49,9 +49,9 @@ def open_session(cid, **kw):
 def scan_open(c, sid, std_id=None, name=None):
     p = c.page
     p.goto(BASE + '/s/scan.html?s=' + sid)
-    p.wait_for_selector('#selS option[value="660001"]', state='attached')
+    p.wait_for_selector('#stdId')
     if std_id:
-        p.select_option('#selS', std_id)
+        p.fill('#stdId', std_id)                  # กรอกรหัสนักศึกษา (หน้าสแกนไม่มี dropdown แล้ว)
 
 
 def pin_fill(p, ids, val='1234'):
@@ -119,8 +119,7 @@ def _():
     p = s.page
     scan_open(s, sid)
     assert 'เปิดรับเช็คชื่อ' in p.inner_text('#stBanner')
-    p.fill('#fq', '660001')                       # ค้นหาแล้วเลือกให้อัตโนมัติ
-    assert p.input_value('#selS') == '660001'
+    p.fill('#stdId', '660001')                    # กรอกรหัสนักศึกษา
     p.click('#go')
     p.wait_for_selector('#npin')
     assert 'ตั้ง PIN ครั้งแรก' in p.inner_text('#pinBox')
@@ -134,7 +133,7 @@ def _():
     assert 'is-new' in (t.page.get_attribute('#stTbl tr[data-std="660001"]', 'class') or '')
     # เปิดอีกครั้ง (เครื่องเดิม จำชื่อไว้) → เช็คซ้ำ
     scan_open(s, sid)
-    p.wait_for_function("document.getElementById('selS').value==='660001'")
+    p.wait_for_function("document.getElementById('stdId').value==='660001'")      # จำรหัสล่าสุดไว้ในเครื่อง
     p.click('#go')
     p.wait_for_selector('#okTitle')
     assert 'ไว้แล้ว' in p.inner_text('#okTitle')
@@ -179,7 +178,7 @@ def _():
     p.click('#go'); p.wait_for_selector('#npin'); pin_fill(p, ['npin', 'npin2']); p.click('#go'); p.wait_for_selector('#okTitle')
     # คนที่ 2 บนเครื่องเดิม
     scan_open(s, sid)
-    p.select_option('#selS', '660002')
+    p.fill('#stdId', '660002')
     p.click('#go')
     p.wait_for_selector('#askBtn')
     assert 'นักศึกษา 1' in p.inner_text('#conflict')
@@ -411,8 +410,13 @@ def _():
     sid = open_session(cid)
     s = student()
     s.page.goto(BASE + '/s/scan.html?s=' + sid)
-    s.page.wait_for_selector('#selS option[value="660001"]', state='attached')
-    assert '<img' in s.page.inner_text('#selS')
+    s.page.wait_for_selector('#stdId')
+    s.page.fill('#stdId', '660001')
+    s.page.click('#go'); s.page.wait_for_selector('#npin')
+    for i in ['npin', 'npin2']:
+        s.page.fill('#' + i, '1234')
+    s.page.click('#go'); s.page.wait_for_selector('#okTitle')
+    assert '<img' in s.page.inner_text('#done')          # ชื่อที่มี HTML แสดงเป็นข้อความ ไม่รันสคริปต์
     assert s.page.evaluate('window.__x') is None
     t = teacher()
     t.login_as(T1, 'อ.หนึ่ง', to='/t/att-live.html?s=' + sid)

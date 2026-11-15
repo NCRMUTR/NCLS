@@ -176,6 +176,8 @@ var ROUTES = {
   'att.import':       { auth: { system: 'att' }, write: true, fn: function (a, u) { return Attendance.importRows(u, a); } },
   'att.deleteSession':{ auth: { system: 'att' }, write: true, fn: function (a, u) { return Attendance.deleteSession(u, a); } },
   'att.deleteEmpty':  { auth: { system: 'att' }, write: true, fn: function (a, u) { return Attendance.deleteEmpty(u, a); } },
+  // รวมคำขอของหน้าเช็คชื่อเป็นครั้งเดียว: วิชา + คาบที่เปิดอยู่ + ประวัติคาบ + ค่าเริ่มต้นเช็คชื่อ (แทน 4 คำขอ = ลดจำนวนการรันสคริปต์)
+  'att.page':         { auth: { system: 'att' }, fn: function (a, u) { return Attendance.page(u, a); } },
   'att.current':      { auth: { system: 'att' }, fn: function (a, u) { return Attendance.current(u, a); } },
   'att.live':         { auth: { system: 'att' }, fn: function (a, u) { return Attendance.live(u, a); } },
   'att.sessions':     { auth: { system: 'att' }, fn: function (a, u) { return Attendance.sessionsList(u, a); } },

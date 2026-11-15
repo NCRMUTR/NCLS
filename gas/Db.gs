@@ -172,6 +172,28 @@ var Db = (function () {
   var SCHEMA_VERSION = '0.7.1';
 
   var _ss = null, _checked = false, _cache = {}, _props = null, _idx = {};
+  var _rec = {}, _sheets = {}, _last = {}, _xv = {};      // _rec = pk→แถว (คู่กับ _cache) · _sheets = ออบเจ็กต์ชีต · _last = แถวสุดท้าย · _xv = เวอร์ชันแคชข้าม execution (ต่อ execution)
+
+  /* ---------- แคชข้าม execution (CacheService) ----------
+   * ตารางเล็กที่ถูกอ่านซ้ำเกือบทุกคำขอและแก้ไม่บ่อย: อ่านจากแคชแทนชีต · ทุกการเขียนเปลี่ยนเลขเวอร์ชัน (คีย์แคชใหม่) → ไม่มีข้อมูลเก่าค้าง
+   * (เขียนอยู่ใน lock เสมอ และเปลี่ยนเวอร์ชันก่อนปล่อย lock · แคชพังหรือใหญ่เกิน = อ่านชีตตามปกติ) */
+  var XT = { Terms: 1, Courses: 1, Users: 1, Students: 1 };
+  var X_TTL = 600, SMALL_ROWS = 400;
+  function xver_(name) {
+    if (_xv[name] === undefined) {
+      var v = U.cGet('XV_' + name);
+      if (!v) { v = String(Date.now()) + U.randomHex(2); U.cPut('XV_' + name, v, 21600); }
+      _xv[name] = v;
+    }
+    return _xv[name];
+  }
+  function xbump_(name) {
+    if (!XT[name]) return;
+    var v = String(Date.now()) + U.randomHex(2);
+    U.cPut('XV_' + name, v, 21600);
+    _xv[name] = v;
+  }
+  function inval_(name) { delete _cache[name]; delete _idx[name]; delete _rec[name]; delete _last[name]; }
 
   /* ---------- ScriptProperties (อ่านครั้งเดียวต่อ execution) ---------- */
   function props_() {
@@ -198,7 +220,7 @@ var Db = (function () {
   function setSsId(id) {
     setProp('HBT_SS_ID', id);
     setProp('HBT_SCHEMA_VER', '');
-    _ss = null; _checked = false; _cache = {}; _idx = {};
+    _ss = null; _checked = false; _cache = {}; _idx = {}; _rec = {}; _sheets = {}; _last = {}; _xv = {};
   }
 
   function ss() {
@@ -283,37 +305,56 @@ var Db = (function () {
   }
 
   function sheet(name) {
+    if (_sheets[name]) return _sheets[name];
     ensureSchema();
     var sh = ss().getSheetByName(name);
     if (!sh) throw U.E('E_NOT_FOUND', { sheet: name });
+    _sheets[name] = sh;
     return sh;
   }
   function cols(name) { return SCHEMA[name].cols.map(function (c) { return c[0]; }); }
+  /** แถวสุดท้ายของชีต (จำไว้ใน execution · ล้างเมื่อเขียน/flush) */
+  function lastRow_(name) {
+    if (_last[name] === undefined) _last[name] = sheet(name).getLastRow();
+    return _last[name];
+  }
 
   /* ---------- อ่าน ---------- */
+  function setLoaded_(name, out) {
+    var map = {}, rec = {}, pk = SCHEMA[name].pk;
+    for (var i = 0; i < out.length; i++) { map[out[i][pk]] = out[i]._row; rec[out[i][pk]] = out[i]; }
+    _cache[name] = out; _idx[name] = map; _rec[name] = rec;
+    return out;
+  }
   function all(name) {
     if (_cache[name]) return _cache[name];
-    var sh = sheet(name), last = sh.getLastRow(), hs = cols(name);
-    if (last < 2) { _cache[name] = []; return []; }
-    var values = sh.getRange(2, 1, last - 1, hs.length).getValues();
-    var out = [], map = {};
+    var key = '';
+    if (XT[name]) {                                    // คีย์คำนวณก่อนอ่านชีต (กันแคชเก่าถูกเขียนทับคีย์ใหม่)
+      key = 'XT_' + name + '_' + xver_(name);
+      var hit = U.cGet(key);
+      var arr = hit ? U.parse(hit, null) : null;
+      if (Array.isArray(arr)) return setLoaded_(name, arr);
+    }
+    var last = lastRow_(name), hs = cols(name);
+    if (last < 2) return setLoaded_(name, []);
+    var values = sheet(name).getRange(2, 1, last - 1, hs.length).getValues();
+    var out = [];
     for (var r = 0; r < values.length; r++) {
       var row = values[r], o = { _row: r + 2 }, empty = true;
       for (var c = 0; c < hs.length; c++) {
         o[hs[c]] = U.cell2str(row[c]);
         if (o[hs[c]] !== '') empty = false;
       }
-      if (!empty) { out.push(o); map[o[SCHEMA[name].pk]] = o._row; }
+      if (!empty) out.push(o);
     }
-    _cache[name] = out;
-    _idx[name] = map;
-    return out;
+    if (key) U.cPut(key, JSON.stringify(out), X_TTL);
+    return setLoaded_(name, out);
   }
   function where(name, pred) { return all(name).filter(pred); }
 
   function rowById(name, id) {
     if (_idx[name] && _idx[name][id]) return _idx[name][id];
-    var sh = sheet(name), last = sh.getLastRow();
+    var sh = sheet(name), last = lastRow_(name);
     if (last < 2) return 0;
     var pkCol = cols(name).indexOf(SCHEMA[name].pk) + 1;
     var found = sh.getRange(2, pkCol, last - 1, 1).createTextFinder(String(id)).matchCase(true).matchEntireCell(true).findNext();
@@ -329,25 +370,48 @@ var Db = (function () {
     return o;
   }
   function byId(name, id) {
-    if (_cache[name]) {
-      var list = _cache[name], pk = SCHEMA[name].pk;
-      for (var i = 0; i < list.length; i++) if (list[i][pk] === id) return list[i];
-      return null;
-    }
+    if (!_cache[name] && (XT[name] || lastRow_(name) - 1 <= SMALL_ROWS)) all(name);      // ตารางเล็ก/แคชข้าม execution: อ่านทั้งตารางครั้งเดียว (1 คำสั่ง) แล้วค้นในหน่วยความจำ
+    if (_cache[name]) return _rec[name][String(id)] || null;
     var row = rowById(name, id);
     if (!row) return null;
     var rec = readRow(name, row);
     // ตรวจค่าจริงซ้ำอีกชั้น (กันกรณี TextFinder ให้ผลคลาดเคลื่อน)
     return rec[SCHEMA[name].pk] === String(id) ? rec : null;
   }
+  /**
+   * แถวที่คอลัมน์ colName = value · เดิมอ่านทีละแถว (N+1 คำสั่ง) → ตอนนี้
+   *   ตารางที่แคชไว้/ตารางเล็ก: อ่านทั้งตารางคำสั่งเดียวแล้วกรองในหน่วยความจำ
+   *   ตารางใหญ่: TextFinder หาเลขแถว แล้วอ่านเป็น "ช่วงต่อเนื่อง" (ช่องว่างไม่เกิน GAP แถวรวมเป็นช่วงเดียว) = 2–4 คำสั่งแทน N
+   */
+  var GAP = 25;
   function findRows(name, colName, value) {
-    var sh = sheet(name), last = sh.getLastRow();
-    if (last < 2) return [];
-    var ci = cols(name).indexOf(colName) + 1;
+    var hs = cols(name), ci = hs.indexOf(colName) + 1, v = String(value);
     if (ci < 1) throw U.E('E_NOT_FOUND', { col: colName });
-    var hits = sh.getRange(2, ci, last - 1, 1).createTextFinder(String(value)).matchCase(true).matchEntireCell(true).findAll();
-    return hits.map(function (h) { return readRow(name, h.getRow()); })
-      .filter(function (r) { return r[colName] === String(value); });
+    if (_cache[name] || XT[name] || lastRow_(name) - 1 <= SMALL_ROWS) {
+      return all(name).filter(function (r) { return r[colName] === v; });
+    }
+    var last = lastRow_(name);
+    if (last < 2) return [];
+    var sh = sheet(name);
+    var hits = sh.getRange(2, ci, last - 1, 1).createTextFinder(v).matchCase(true).matchEntireCell(true).findAll();
+    if (!hits.length) return [];
+    var rows = hits.map(function (h) { return h.getRow(); }).sort(function (a, b) { return a - b; });
+    var runs = [], a = rows[0], b = rows[0];
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i] - b <= GAP) b = rows[i]; else { runs.push([a, b]); a = b = rows[i]; }
+    }
+    runs.push([a, b]);
+    var out = [];
+    runs.forEach(function (run) {
+      var vals = sh.getRange(run[0], 1, run[1] - run[0] + 1, hs.length).getValues();
+      for (var j = 0; j < vals.length; j++) {
+        if (U.cell2str(vals[j][ci - 1]) !== v) continue;           // ตรวจค่าจริงซ้ำ (แถวคั่นกลางช่วงไม่ตรงค่าก็ข้าม)
+        var o = { _row: run[0] + j };
+        for (var c = 0; c < hs.length; c++) o[hs[c]] = U.cell2str(vals[j][c]);
+        out.push(o);
+      }
+    });
+    return out;
   }
 
   /* ---------- เขียน ---------- */
@@ -358,20 +422,20 @@ var Db = (function () {
     });
   }
   function insert(name, obj) {
-    var sh = sheet(name);
-    ensureFormat(name, sh.getLastRow() + 1);
+    var sh = sheet(name), last = lastRow_(name);
+    ensureFormat(name, last + 1);
     sh.appendRow(rowValues(name, obj));
-    delete _cache[name]; delete _idx[name];
-    obj._row = sh.getLastRow();
+    inval_(name); _last[name] = last + 1; xbump_(name);
+    obj._row = last + 1;
     return obj;
   }
   function insertMany(name, objs) {
     if (!objs || !objs.length) return 0;
-    var sh = sheet(name), start = sh.getLastRow() + 1;
+    var sh = sheet(name), start = lastRow_(name) + 1;
     ensureFormat(name, start + objs.length);
     var data = objs.map(function (o) { return rowValues(name, o); });
     sh.getRange(start, 1, data.length, cols(name).length).setValues(data);
-    delete _cache[name]; delete _idx[name];
+    inval_(name); _last[name] = start + data.length - 1; xbump_(name);
     return data.length;
   }
   function update(name, id, patch) {
@@ -384,14 +448,14 @@ var Db = (function () {
       return (v === null || v === undefined) ? '' : U.clip(String(v));
     });
     sh.getRange(row, 1, 1, hs.length).setValues([out]);
-    delete _cache[name];
+    delete _cache[name]; delete _rec[name]; xbump_(name);
     return true;
   }
   /** แก้หลายแถวทีละ "คอลัมน์" rowPatch = { <เลขแถว>: { col: value } } */
   function bulkPatch(name, rowPatch) {
     var rows = Object.keys(rowPatch).map(Number);
     if (!rows.length) return 0;
-    var sh = sheet(name), last = sh.getLastRow();
+    var sh = sheet(name), last = lastRow_(name);
     if (last < 2) return 0;
     var hs = cols(name), touched = {};
     rows.forEach(function (r) { Object.keys(rowPatch[r]).forEach(function (k) { touched[k] = true; }); });
@@ -406,14 +470,14 @@ var Db = (function () {
       });
       rng.setValues(vals);
     });
-    delete _cache[name];
+    delete _cache[name]; delete _rec[name]; xbump_(name);
     return rows.length;
   }
   function remove(name, id) {
     var row = rowById(name, id);
     if (!row) return false;
     sheet(name).deleteRow(row);
-    delete _cache[name]; delete _idx[name];
+    inval_(name); xbump_(name);
     return true;
   }
   /**
@@ -421,7 +485,7 @@ var Db = (function () {
    * pred(record) = true คือแถวที่ต้องลบ · คืนจำนวนที่ลบ
    */
   function removeWhere(name, pred) {
-    var sh = sheet(name), last = sh.getLastRow(), hs = cols(name);
+    var sh = sheet(name), last = lastRow_(name), hs = cols(name);
     if (last < 2) return 0;
     var rng = sh.getRange(2, 1, last - 1, hs.length), values = rng.getValues();
     var keep = [], removed = 0;
@@ -435,12 +499,12 @@ var Db = (function () {
     for (var i = 0; i < removed; i++) blank.push(hs.map(function () { return ''; }));
     var out = keep.concat(blank);
     rng.setValues(out);
-    delete _cache[name]; delete _idx[name];
+    inval_(name); xbump_(name);
     return removed;
   }
-  function flush() { _cache = {}; _idx = {}; }
+  function flush() { _cache = {}; _idx = {}; _rec = {}; _last = {}; _xv = {}; }
   function reloadProps() { _props = null; }
-  function resetRuntime() { _ss = null; _checked = false; _cache = {}; _idx = {}; _props = null; }
+  function resetRuntime() { _ss = null; _checked = false; _cache = {}; _idx = {}; _rec = {}; _sheets = {}; _last = {}; _xv = {}; _props = null; }
 
   return {
     T: T, SCHEMA: SCHEMA, VERSION: SCHEMA_VERSION,
