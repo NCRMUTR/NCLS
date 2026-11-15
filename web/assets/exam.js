@@ -71,7 +71,7 @@ HBT.page({ active: 'exam', need: 'exam', crumbs: [['รายวิชาขอ�
 
   function render() {
     var c = course;
-    document.title = 'สอบออนไลน์ ' + c.code + ' — HBT Teaching';
+    document.title = 'สอบออนไลน์ ' + c.code + ' — HBT Learning System';
     var h = '<div class="page-h"><div class="stack-s"><h1>สอบออนไลน์ <span class="muted">' + esc(c.code) + ' กลุ่ม ' + esc(c.section) + '</span></h1><p>' + esc(c.name) + '</p></div>' +
       '<div class="row">' + (tab === 'rounds' ? '<button class="btn primary" type="button" id="newRound">สร้างรอบสอบ / ฝึกทำ</button>' : '<button class="btn primary" type="button" id="newQuiz">สร้างแบบทดสอบ</button>') + '</div></div>';
     if (!c.current) h += '<div class="callout warn" id="notCur"><b>วิชานี้ไม่ใช่ของภาคเรียนปัจจุบัน</b> — นักศึกษาจะเข้าสอบไม่ได้</div>';

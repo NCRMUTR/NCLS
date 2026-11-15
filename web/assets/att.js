@@ -45,7 +45,7 @@ HBT.page({ active: 'att', need: 'att', crumbs: [['รายวิชาของ
 
   function render() {
     var c = course;
-    document.title = 'เช็คชื่อ ' + c.code + ' — HBT Teaching';
+    document.title = 'เช็คชื่อ ' + c.code + ' — HBT Learning System';
     var h = '<div class="page-h"><div class="stack-s"><h1>เช็คชื่อ <span class="muted">' + esc(c.code) + ' กลุ่ม ' + esc(c.section) + '</span></h1><p>' + esc(c.name) + ' · นักศึกษา ' + c.students + ' คน</p></div>' +
       '<div class="row"><a class="btn" id="goReport" href="' + root + 't/att-report.html?id=' + q + '">รายงานเข้าเรียน</a><a class="btn" href="' + root + 't/course.html?id=' + q + '">กลับหน้าวิชา</a></div></div>';
 

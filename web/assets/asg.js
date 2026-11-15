@@ -19,11 +19,13 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
     '<label class="choice"><input type="radio" name="fK" value="group"><span><b>งานกลุ่ม</b><br><span class="small muted">ตัวแทนสร้างกลุ่มและส่งแทน</span></span></label></div>' +
     '<div class="err small" id="kNote"></div>' +
     '<div class="grid g2"><div class="field"><label for="fM">คะแนนเต็ม</label><input id="fM" type="number" inputmode="decimal" min="0.01" max="1000" step="any" value="10"></div>' +
-    '<div class="field" id="gWrap" hidden><label for="fG">สมาชิกกลุ่มสูงสุด (คน)</label><input id="fG" type="number" inputmode="numeric" min="1" max="30" step="1" value="5"></div></div>' +
+    '<div class="field"><label for="fP">สัดส่วนที่เก็บ (% ของคะแนนรวมวิชา)</label><input id="fP" type="number" inputmode="decimal" min="0" max="100" step="any" value="0"><span class="help" id="fPh">ใส่ 0 = ยังไม่นับรวม · ตั้งหรือแก้ภายหลังที่หน้า คะแนน ได้</span></div></div>' +
+    '<div class="grid g2"><div class="field" id="gWrap" hidden><label for="fG">สมาชิกกลุ่มสูงสุด (คน)</label><input id="fG" type="number" inputmode="numeric" min="1" max="30" step="1" value="5"></div></div>' +
     '<div class="grid g2"><div class="field"><label for="fDue">กำหนดส่ง (ไม่บังคับ)</label><input id="fDue" type="datetime-local"></div>' +
     '<div class="field"><label for="fClose">ปิดรับ (ไม่บังคับ)</label><input id="fClose" type="datetime-local"></div></div>' +
     '<label class="check"><input type="checkbox" id="fLate"><span>รับงานที่ส่งช้า (เลยกำหนดส่งแต่ก่อนวันปิดรับ — บันทึกว่า “ส่งช้า”)</span></label>' +
-    '<label class="check"><input type="checkbox" id="fShow" checked><span>ให้นักศึกษาเห็นคะแนนและความเห็นของตัวเอง</span></label>' +
+    '<label class="check"><input type="checkbox" id="fReq" checked><span>ต้องแนบไฟล์ (ถ้าเอาออก นักศึกษาส่งเป็นข้อความ/ลิงก์อย่างเดียวได้)</span></label>' +
+    '<label class="check"><input type="checkbox" id="fShow"><span>ให้นักศึกษาเห็นคะแนนและความเห็นของตัวเอง (ค่าเริ่มต้น: ไม่แสดง)</span></label>' +
     '<div class="field"><label for="fL">ลิงก์ประกอบงาน (ไม่บังคับ)</label><input id="fL" type="url" inputmode="url" maxlength="500" placeholder="https://" autocomplete="off"></div>' +
     '<div class="err" id="eErr" role="alert"></div>' +
     '<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close type="button">ยกเลิก</button><button class="btn primary" type="button" id="eSave">บันทึก</button></div></div></div>' +
@@ -44,7 +46,7 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
 
   function render() {
     var c = course;
-    document.title = 'ส่งงาน ' + c.code + ' — HBT Teaching';
+    document.title = 'ส่งงาน ' + c.code + ' — HBT Learning System';
     var h = '<div class="page-h"><div class="stack-s"><h1>ส่งงาน <span class="muted">' + esc(c.code) + ' กลุ่ม ' + esc(c.section) + '</span></h1>' +
       '<p>' + esc(c.name) + ' · นักศึกษา ' + data.students + ' คน</p></div>' +
       '<div class="row"><button class="btn primary" type="button" id="newBtn">สั่งงานใหม่</button></div></div>';
@@ -56,7 +58,7 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
       h += '<div class="stack" id="list">' + data.assignments.map(function (a) {
         var s = a.stats;
         return '<div class="card stack-s" data-asg="' + esc(a.asgId) + '"><div class="row sp"><h3>' + esc(a.title) + '</h3><div class="row"><span class="pill ' + (a.kind === 'group' ? 'info' : 'acc') + '">' + (a.kind === 'group' ? 'กลุ่ม' : 'เดี่ยว') + '</span>' + phasePill(a.phase) + '</div></div>' +
-          '<p class="small muted">รหัสงาน <b class="mono">' + esc(a.code) + '</b> · เต็ม ' + esc(a.maxScore) + (a.dueAt ? ' · กำหนดส่ง ' + esc(fmt(a.dueAt)) : ' · ไม่กำหนดวันส่ง') + (a.closeAt ? ' · ปิดรับ ' + esc(fmt(a.closeAt)) : '') + '</p>' +
+          '<p class="small muted">รหัสงาน <b class="mono">' + esc(a.code) + '</b> · เต็ม ' + esc(a.maxScore) + ' · สัดส่วน ' + esc(a.pct) + '%' + (a.requireFile ? ' · ต้องแนบไฟล์' : ' · ไม่บังคับแนบไฟล์') + (a.dueAt ? ' · กำหนดส่ง ' + esc(fmt(a.dueAt)) : ' · ไม่กำหนดวันส่ง') + (a.closeAt ? ' · ปิดรับ ' + esc(fmt(a.closeAt)) : '') + '</p>' +
           '<div class="row small"><span class="pill ' + (s.submitted ? 'good' : '') + '">ส่งแล้ว ' + s.submitted + ' / ' + s.total + (a.kind === 'group' ? ' กลุ่ม' : '') + '</span>' +
           (s.toGrade ? '<span class="pill warn">รอตรวจ ' + s.toGrade + '</span>' : '') + (s.graded ? '<span class="pill info">ตรวจแล้ว ' + s.graded + '</span>' : '') +
           (s.late ? '<span class="pill warn">ส่งช้า ' + s.late + '</span>' : '') + (a.kind === 'group' && s.ungrouped ? '<span class="pill">ยังไม่มีกลุ่ม ' + s.ungrouped + ' คน</span>' : '') + '</div>' +
@@ -84,7 +86,8 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
     HBT.$$('input[name=fK]').forEach(function (r) { r.checked = r.value === (a ? a.kind : 'single'); });
     $('#fM').value = a ? a.maxScore : 10; $('#fG').value = a ? a.maxGroup : 5;
     $('#fDue').value = a ? toInput(a.dueAt) : ''; $('#fClose').value = a ? toInput(a.closeAt) : '';
-    $('#fLate').checked = a ? a.lateOk : false; $('#fShow').checked = a ? a.showGrades : true; $('#fL').value = a ? a.linkUrl : '';
+    $('#fLate').checked = a ? a.lateOk : false; $('#fShow').checked = a ? a.showGrades : false; $('#fReq').checked = a ? a.requireFile : true; $('#fL').value = a ? a.linkUrl : '';
+    $('#fP').value = a ? a.pct : 0;
     var used = a && (a.stats.submitted > 0 || a.stats.ungrouped < data.students && a.kind === 'group');
     HBT.$$('input[name=fK]').forEach(function (r) { r.disabled = !!used; });
     $('#kNote').textContent = used ? 'เปลี่ยนประเภทงานไม่ได้แล้ว เพราะมีการส่งงานหรือมีกลุ่มแล้ว' : '';
@@ -93,7 +96,7 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
   $('#eSave').addEventListener('click', function () {
     var b = this, p = {
       title: $('#fT').value, description: $('#fD').value, kind: kindOf(), maxScore: $('#fM').value, maxGroup: $('#fG').value,
-      dueAt: fromInput($('#fDue').value), closeAt: fromInput($('#fClose').value), lateOk: $('#fLate').checked, showGrades: $('#fShow').checked, linkUrl: $('#fL').value.trim()
+      dueAt: fromInput($('#fDue').value), closeAt: fromInput($('#fClose').value), lateOk: $('#fLate').checked, showGrades: $('#fShow').checked, requireFile: $('#fReq').checked, pct: $('#fP').value.trim(), linkUrl: $('#fL').value.trim()
     };
     $('#eErr').textContent = '';
     if (!p.title.trim()) { $('#eErr').textContent = 'กรุณากรอกชื่องาน'; return; }

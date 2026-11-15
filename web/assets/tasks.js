@@ -11,7 +11,7 @@
     return;
   }
   function head(sub) {
-    return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Teaching</a><h1>งานของฉัน</h1>' + (sub || '') + '</div>';
+    return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Learning System</a><h1>งานของฉัน</h1>' + (sub || '') + '</div>';
   }
   function foot() { return '<p class="small muted"><a href="' + root + 's/submit.html">ใส่รหัสงานเพื่อส่งงาน</a> · <a href="' + root + 's/home.html">กลับหน้าแรก</a></p>'; }
   function fmt(t) { return t ? HBT.fmtBE(t, true) : ''; }

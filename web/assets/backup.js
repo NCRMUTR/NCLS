@@ -32,7 +32,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
 
   function render() {
     var c = course, st = STATE[man.state] || STATE.none, q = encodeURIComponent(id);
-    document.title = 'สำรองข้อมูล ' + c.code + ' — HBT Teaching';
+    document.title = 'สำรองข้อมูล ' + c.code + ' — HBT Learning System';
     var done = items.filter(function (i) { return i.status === 'done' || i.skip; }).length;
     $('#box').innerHTML =
       '<div class="page-h"><div class="stack-s"><h1>สำรองข้อมูลวิชา</h1><p>' + esc(c.code) + ' กลุ่ม ' + esc(c.section) + ' — ' + esc(c.name) + '</p>' +

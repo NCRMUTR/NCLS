@@ -72,7 +72,15 @@ var Assignments = (function () {
     return (rows || []).slice().sort(function (a, b) { return a.uploaded_at < b.uploaded_at ? -1 : 1; })
       .map(function (f) { return { fileId: f.file_id, name: f.name, size: Number(f.size) || 0, uploadedAt: f.uploaded_at }; });
   }
-  function hasContent_(sub, files) { return !!sub && ((files && files.length) || sub.note || sub.link); }
+  /** งานนี้ต้องแนบไฟล์ไหม (แถวเก่าที่ช่องว่าง = ต้องแนบ ซึ่งเป็นค่าเริ่มต้น) */
+  function needFile_(a) { return a.require_file === '' || a.require_file === undefined || a.require_file === null || U.bool(a.require_file); }
+  /** มีเนื้อหาที่ส่งไหม · ถ้าส่ง a มา และงานนั้น “ต้องแนบไฟล์” จะนับว่าส่งแล้วก็ต่อเมื่อมีไฟล์ */
+  function hasContent_(sub, files, a) {
+    if (!sub) return false;
+    var f = !!(files && files.length);
+    if (a && needFile_(a)) return f;
+    return !!(f || sub.note || sub.link);
+  }
 
   /** หน่วยงาน: เดี่ยว = นักศึกษา 1 คน · กลุ่ม = 1 กลุ่ม  (+ รายชื่อคนที่ยังไม่มีกลุ่ม) */
   function units_(a, L) {
@@ -139,13 +147,14 @@ var Assignments = (function () {
       asgId: a.asg_id, courseId: a.course_id, code: a.code, title: a.title, description: a.description, kind: a.kind,
       maxScore: Number(a.max_score), dueAt: a.due_at, lateOk: U.bool(a.late_ok), closeAt: a.close_at, status: a.status,
       phase: phase_(a, Date.now()), maxGroup: Number(a.max_group) || 5, showGrades: U.bool(a.show_grades), linkUrl: a.link_url,
+      requireFile: needFile_(a),
       createdAt: a.created_at, updatedAt: a.updated_at
     };
   }
   function statsOf_(a, L) {
     var u = units_(a, L), st = { total: u.units.length, submitted: 0, late: 0, toGrade: 0, graded: 0, ungrouped: u.ungrouped.length };
     u.units.forEach(function (x) {
-      if (!hasContent_(x.sub, x.files)) return;
+      if (!hasContent_(x.sub, x.files, a)) return;
       st.submitted++;
       if (isLate_(a, x.sub.updated_at)) st.late++;
       if (allGraded_(L, a.asg_id, x)) st.graded++; else st.toGrade++;
@@ -164,15 +173,16 @@ var Assignments = (function () {
   /* ============================== อาจารย์ ============================== */
   function list(user, a) {
     var c = Courses.require(user, a.courseId), L = load_(c.course_id);
+    var pm = Scores.pctMap(c.course_id, 'ASSIGN');
     var rows = Db.findRows('Assignments', 'course_id', c.course_id).sort(function (x, y) { return x.created_at < y.created_at ? 1 : -1; }).map(function (r) {
-      var o = asgOut_(r); o.stats = statsOf_(r, L); return o;
+      var o = asgOut_(r); o.stats = statsOf_(r, L); o.pct = pm[r.asg_id] || 0; return o;
     });
     return { assignments: rows, students: L.roster.length, tid: Courses.tidOf(c.owner_email) };
   }
 
   function get(user, a) {
     var r = asgFor_(user, a.asgId), L = load_(r.course_id), o = asgOut_(r);
-    o.stats = statsOf_(r, L); o.limits = limits_();
+    o.stats = statsOf_(r, L); o.limits = limits_(); o.pct = Scores.pctMap(r.course_id, 'ASSIGN')[r.asg_id] || 0;
     var co = Db.byId('Courses', r.course_id);
     o.tid = Courses.tidOf(co.owner_email); o.course = { courseId: co.course_id, code: co.code, name: co.name, section: co.section };
     return o;
@@ -195,7 +205,10 @@ var Assignments = (function () {
     var lateOk = bool_(a.lateOk, ex ? U.bool(ex.late_ok) : false);
     var maxGroup = a.maxGroup !== undefined && a.maxGroup !== '' ? Number(a.maxGroup) : (ex ? Number(ex.max_group) || 5 : 5);
     if (isNaN(maxGroup) || Math.floor(maxGroup) !== maxGroup || maxGroup < 1 || maxGroup > 30) throw U.E('E_ASG_FIELD', { field: 'maxGroup' }, 'จำนวนสมาชิกกลุ่มต้องเป็นจำนวนเต็ม 1–30');
-    var showGrades = bool_(a.showGrades, ex ? U.bool(ex.show_grades) : true);
+    var showGrades = bool_(a.showGrades, ex ? U.bool(ex.show_grades) : false);        // ค่าเริ่มต้น: ไม่แสดงคะแนนให้นักศึกษา
+    var requireFile = bool_(a.requireFile, ex ? needFile_(ex) : true);                  // ค่าเริ่มต้น: ต้องแนบไฟล์
+    var pct = null;                                                                     // สัดส่วน % ของงานนี้ในคะแนนรวม (ไม่ส่งมา = ไม่แตะ)
+    if (a.pct !== undefined && a.pct !== null && a.pct !== '') pct = Scores.checkPct(ex ? ex.course_id : c.course_id, a.pct, ex ? 'ASSIGN' : '', ex ? ex.asg_id : '');
     var link = a.linkUrl !== undefined ? oneLine_(a.linkUrl, 500) : (ex ? ex.link_url : '');
     if (link && !/^https?:\/\/[^\s]{3,}$/i.test(link)) throw U.E('E_ASG_FIELD', { field: 'linkUrl' }, 'ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://');
     var now = U.nowIso();
@@ -208,9 +221,9 @@ var Assignments = (function () {
       Db.insert('Assignments', {
         asg_id: id, course_id: c.course_id, code: code, title: title, description: desc, kind: kind, max_score: maxScore, due_at: dueAt,
         late_ok: U.bstr(lateOk), close_at: closeAt, status: 'open', max_group: maxGroup, show_grades: U.bstr(showGrades), link_url: link,
-        folder_id: folder.getId(), created_by: user.email, created_at: now, updated_at: now
+        folder_id: folder.getId(), created_by: user.email, created_at: now, updated_at: now, require_file: U.bstr(requireFile)
       });
-      Scores.ensureType(c.course_id, 'ASSIGN', id, { name: title, max: maxScore });
+      Scores.ensureType(c.course_id, 'ASSIGN', id, { name: title, max: maxScore, pct: pct || 0 });
       Courses.touch(c.course_id);
       Audit.log(user.email, 'asg.create', id, { course: c.course_id, code: code, kind: kind });
       return get(user, { asgId: id });
@@ -228,9 +241,10 @@ var Assignments = (function () {
     }
     Db.update('Assignments', ex.asg_id, {
       title: title, description: desc, kind: kind, max_score: maxScore, due_at: dueAt, late_ok: U.bstr(lateOk), close_at: closeAt,
-      max_group: maxGroup, show_grades: U.bstr(showGrades), link_url: link, updated_at: now
+      max_group: maxGroup, show_grades: U.bstr(showGrades), link_url: link, updated_at: now, require_file: U.bstr(requireFile)
     });
     Scores.updateAuto(ex.course_id, 'ASSIGN', ex.asg_id, { name: title, max: maxScore });
+    if (pct !== null) { Scores.ensureType(ex.course_id, 'ASSIGN', ex.asg_id, { name: title, max: maxScore }); Scores.setAutoPct(ex.course_id, 'ASSIGN', ex.asg_id, pct); }
     Courses.touch(ex.course_id);
     Audit.log(user.email, 'asg.update', ex.asg_id, '');
     return get(user, { asgId: ex.asg_id });
@@ -264,7 +278,7 @@ var Assignments = (function () {
   function submissions(user, a) {
     var r = asgFor_(user, a.asgId), L = load_(r.course_id), u = units_(r, L);
     var units = u.units.map(function (x) {
-      var has = hasContent_(x.sub, x.files);
+      var has = hasContent_(x.sub, x.files, r);
       return {
         subKey: x.subKey, groupId: x.groupId, name: x.name, rep: x.groupId ? { stdId: x.rep, name: nameOf_(L, x.rep) } : null,
         members: x.members.map(function (s) {
@@ -275,7 +289,8 @@ var Assignments = (function () {
         late: has ? isLate_(r, x.sub.updated_at) : false, files: has ? filesOut_(x.files) : [], graded: allGraded_(L, r.asg_id, x)
       };
     });
-    return { assignment: asgOut_(r), units: units, ungrouped: u.ungrouped, stats: statsOf_(r, L) };
+    var ao = asgOut_(r); ao.pct = Scores.pctMap(r.course_id, 'ASSIGN')[r.asg_id] || 0;
+    return { assignment: ao, units: units, ungrouped: u.ungrouped, stats: statsOf_(r, L) };
   }
 
   function fileGet(user, a) {
@@ -350,7 +365,7 @@ var Assignments = (function () {
   function stuTasks(s) {
     var L = load_(s.courseId);
     var rows = Db.findRows('Assignments', 'course_id', s.courseId).sort(function (x, y) { return x.created_at < y.created_at ? 1 : -1; }).map(function (a) {
-      var u = myUnit_(a, s.stdId, L), has = u && hasContent_(u.sub, u.files), g = gradeOf_(L, a.asg_id, s.stdId), show = U.bool(a.show_grades);
+      var u = myUnit_(a, s.stdId, L), has = u && hasContent_(u.sub, u.files, a), g = gradeOf_(L, a.asg_id, s.stdId), show = U.bool(a.show_grades);
       return {
         asgId: a.asg_id, code: a.code, title: a.title, kind: a.kind, maxScore: Number(a.max_score), dueAt: a.due_at, closeAt: a.close_at,
         lateOk: U.bool(a.late_ok), phase: phase_(a, Date.now()), submitted: !!has, updatedAt: has ? u.sub.updated_at : '', late: has ? isLate_(a, u.sub.updated_at) : false,
@@ -375,12 +390,12 @@ var Assignments = (function () {
   function stuTask(s, a) {
     var r = asgOfStudent_(s, a.asgId), L = load_(s.courseId), u = myUnit_(r, s.stdId, L), ed = canEdit_(r, u, s.stdId, L);
     var o = asgOut_(r); delete o.courseId; delete o.createdAt; delete o.updatedAt; delete o.status;
-    var has = u && hasContent_(u.sub, u.files);
+    var has = u && hasContent_(u.sub, u.files, r), any = u && hasContent_(u.sub, u.files);   // has = นับว่าส่งแล้ว · any = มีอะไรค้างอยู่ (เช่น ข้อความที่ยังไม่แนบไฟล์)
     var g = gradeOf_(L, r.asg_id, s.stdId), gr = (L.grades[r.asg_id] || {})[s.stdId];
     var out = {
       asg: o, me: { stdId: s.stdId, name: s.name }, limits: limits_(),
-      group: null, candidates: [],
-      sub: has ? { note: u.sub.note, link: u.sub.link, firstAt: u.sub.first_at, updatedAt: u.sub.updated_at, late: isLate_(r, u.sub.updated_at), files: filesOut_(u.files) } : null,
+      group: null, candidates: [], submitted: !!has,
+      sub: any ? { note: u.sub.note, link: u.sub.link, firstAt: u.sub.first_at, updatedAt: u.sub.updated_at, late: isLate_(r, u.sub.updated_at), files: filesOut_(u.files) } : null,
       canEdit: ed.ok, whyNot: ed.ok ? '' : ed.code,
       grade: g && U.bool(r.show_grades) ? { score: Number(g.score), feedback: gr.feedback } : null, graded: !!g
     };

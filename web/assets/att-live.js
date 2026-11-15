@@ -35,7 +35,7 @@ HBT.page({ active: 'att', need: 'att', crumbs: [['รายวิชาของ
   function skeleton() {
     var s = data.session, c = course;
     scanUrl = new URL('../s/scan.html?s=' + encodeURIComponent(s.sessionId), location.href).href;
-    document.title = 'เช็คชื่อสด ' + (c ? c.code : '') + ' — HBT Teaching';
+    document.title = 'เช็คชื่อสด ' + (c ? c.code : '') + ' — HBT Learning System';
     $('#box').innerHTML =
       '<div class="page-h"><div class="stack-s"><h1 id="lvTitle">เช็คชื่อ ' + (c ? esc(c.code) + ' <span class="muted">กลุ่ม ' + esc(c.section) + '</span>' : '') + '</h1>' +
       '<p class="small muted">' + (c ? esc(c.name) + ' · ' : '') + 'คาบวันที่ ' + esc(HBT.fmtBE(s.date)) + '</p></div>' +

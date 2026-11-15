@@ -313,7 +313,7 @@ test('ปิดงาน/เลยกำหนดไม่รับช้า/ใ
   assert.strictEqual(files(s).length, 2); assert.strictEqual(liveFiles(s).length, 2);
 });
 test('ข้อความ/ลิงก์: บันทึกได้ · ลิงก์ผิดรูปแบบปฏิเสธ · ล้างทั้งหมดและไม่มีไฟล์ = ถอนการส่ง · ลบไฟล์สุดท้ายแต่ยังมีข้อความ = ยังนับว่าส่ง', () => {
-  const s = world(2); const a = mkAsg(s); const t = tok(s, 1);
+  const s = world(2); const a = mkAsg(s, { requireFile: false }); const t = tok(s, 1);
   assert.strictEqual(ok(s.api(t, 'stu.saveNote', { asgId: a.asgId, note: 'ดูในลิงก์', link: 'https://drive.google.com/x' })).saved, true);
   assert.strictEqual(ok(s.api(s.T1, 'asg.submissions', { asgId: a.asgId })).stats.submitted, 1);
   assert.strictEqual(code(s.api(t, 'stu.saveNote', { asgId: a.asgId, note: 'x', link: 'javascript:1' })), 'E_ASG_FIELD');
@@ -324,6 +324,46 @@ test('ข้อความ/ลิงก์: บันทึกได้ · ล�
   ok(s.api(t, 'stu.removeFile', { fileId: f.fileId }));
   assert.strictEqual(sub(s).length, 1); assert.strictEqual(ok(s.api(tok(s, 1), 'stu.task', { asgId: a.asgId })).sub.note, 'หมายเหตุ');
   ok(s.api(t, 'stu.saveNote', { asgId: a.asgId, note: '' })); assert.strictEqual(sub(s).length, 0);
+});
+test('ต้องแนบไฟล์ (ค่าเริ่มต้น): ข้อความ/ลิงก์อย่างเดียวยังไม่นับว่าส่ง · แนบไฟล์แล้วนับ · ปิดตัวเลือก = ข้อความอย่างเดียวนับ', () => {
+  const s = world(2); const a = mkAsg(s); const t = tok(s, 1);
+  assert.strictEqual(a.requireFile, true, 'ค่าเริ่มต้น = ต้องแนบ');
+  assert.strictEqual(a.showGrades, false, 'ค่าเริ่มต้น = ไม่แสดงคะแนนให้นักศึกษา');
+  ok(s.api(t, 'stu.saveNote', { asgId: a.asgId, note: 'ยังไม่แนบไฟล์' }));
+  assert.strictEqual(ok(s.api(s.T1, 'asg.submissions', { asgId: a.asgId })).stats.submitted, 0, 'ข้อความอย่างเดียวไม่นับ');
+  let tk = ok(s.api(t, 'stu.task', { asgId: a.asgId }));
+  assert.strictEqual(tk.submitted, false); assert.strictEqual(tk.sub.note, 'ยังไม่แนบไฟล์', 'ข้อความที่พิมพ์ไว้ไม่หาย');
+  assert.strictEqual(ok(s.api(t, 'stu.tasks', {})).tasks[0].submitted, false);
+  ok(up(s, 1, a.asgId, 'a.pdf'));
+  assert.strictEqual(ok(s.api(s.T1, 'asg.submissions', { asgId: a.asgId })).stats.submitted, 1);
+  assert.strictEqual(ok(s.api(tok(s, 1), 'stu.task', { asgId: a.asgId })).submitted, true);
+  const b = ok(s.api(s.T1, 'asg.save', { asgId: a.asgId, requireFile: false }));
+  assert.strictEqual(b.requireFile, false);
+  assert.strictEqual(ok(s.api(s.T1, 'asg.get', { asgId: a.asgId })).requireFile, false);
+});
+test('สัดส่วน % ของงาน: ตั้งตอนสร้าง/แก้ได้ · เกิน 100 รวมทุกประเภท = E_SCORE_PCT · งานสร้างใหม่ไม่เกิน → ไม่สร้างงานค้าง', () => {
+  const s = world(2);
+  const a = mkAsg(s, { pct: 30 });
+  assert.strictEqual(a.pct, 30);
+  assert.strictEqual(ok(s.api(s.T1, 'score.types', { courseId: s.cid })).types[0].pct, 30);
+  const before = ok(s.api(s.T1, 'asg.list', { courseId: s.cid })).assignments.length;
+  assert.strictEqual(code(s.api(s.T1, 'asg.save', { courseId: s.cid, title: 'งาน 2', kind: 'single', maxScore: 10, pct: 80 })), 'E_SCORE_PCT');
+  assert.strictEqual(ok(s.api(s.T1, 'asg.list', { courseId: s.cid })).assignments.length, before, 'ปฏิเสธแล้วต้องไม่มีงานค้าง');
+  const b = mkAsg(s, { title: 'งาน 2', pct: 70 });
+  assert.strictEqual(code(s.api(s.T1, 'asg.save', { asgId: a.asgId, pct: 31 })), 'E_SCORE_PCT');
+  assert.strictEqual(ok(s.api(s.T1, 'asg.save', { asgId: a.asgId, pct: 20 })).pct, 20);
+  assert.strictEqual(code(s.api(s.T1, 'asg.save', { asgId: b.asgId, pct: 'abc' })), 'E_SCORE_TYPE');
+  assert.strictEqual(ok(s.api(s.T1, 'asg.list', { courseId: s.cid })).assignments.map(x => x.pct).sort().join(), '20,70');
+});
+test('คะแนนที่ตรวจ: หน้าคะแนนแสดง % ของงาน (ได้÷เต็ม×100) · ประเภทงานค่าเริ่มต้นไม่แสดงนักศึกษา', () => {
+  const s = world(2); const a = mkAsg(s, { pct: 20, maxScore: 20 });
+  ok(s.api(s.T1, 'asg.grade', { asgId: a.asgId, grades: [{ stdId: std(1), score: 15 }] }));
+  const tb = ok(s.api(s.T1, 'score.table', { courseId: s.cid }));
+  const ty = tb.types[0];
+  assert.strictEqual(ty.cat, 'asg'); assert.strictEqual(ty.visible, false);
+  const r1 = tb.students.filter(x => x.stdId === std(1))[0];
+  assert.strictEqual(r1.scores[ty.typeId], 15); assert.strictEqual(r1.pcts[ty.typeId], 75); assert.strictEqual(r1.total, 15);
+  assert.strictEqual(tb.students.filter(x => x.stdId === std(2))[0].pcts[ty.typeId], null);
 });
 test('ข้อความมีอักขระควบคุม/ยาวเกิน → ตัดให้ปลอดภัย · HTML เก็บเป็นข้อความดิบ (หน้าเว็บ escape)', () => {
   const s = world(2); const a = mkAsg(s);

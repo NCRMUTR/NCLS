@@ -27,7 +27,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
 
   function render() {
     var c = course, q = encodeURIComponent(c.courseId);
-    document.title = c.code + ' — HBT Teaching';
+    document.title = c.code + ' — HBT Learning System';
     $('#box').innerHTML =
       '<div class="page-h"><div class="stack-s"><h1 id="cTitle">' + esc(c.code) + ' <span class="muted">กลุ่ม ' + esc(c.section) + '</span></h1>' +
       '<p>' + esc(c.name) + '</p><p class="small muted">ภาคเรียน ' + esc(c.termName) + (c.ownerEmail !== ctx.user.email ? ' · เจ้าของ ' + esc(c.ownerEmail) : '') + '</p></div>' +

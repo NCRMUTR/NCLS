@@ -17,7 +17,7 @@ HBT.page({ active: 'att', need: 'att', crumbs: [['รายวิชาของ
 
   function render() {
     var r = rep, c = r.course;
-    document.title = 'รายงานเข้าเรียน ' + c.code + ' — HBT Teaching';
+    document.title = 'รายงานเข้าเรียน ' + c.code + ' — HBT Learning System';
     var h = '<div class="page-h"><div class="stack-s"><h1>รายงานเข้าเรียน <span class="muted">' + esc(c.code) + ' กลุ่ม ' + esc(c.section) + '</span></h1>' +
       '<p>' + esc(c.name) + ' · ' + r.totalSessions + ' คาบที่ปิดแล้ว · นักศึกษา ' + r.students.length + ' คน</p></div>' +
       '<div class="row"><button class="btn" type="button" id="csvBtn">ส่งออก CSV</button><a class="btn" href="' + root + 't/att.html?id=' + q + '">ประวัติคาบ</a></div></div>';

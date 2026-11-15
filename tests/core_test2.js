@@ -375,6 +375,25 @@ function scoreWorld() {
 function mkType(s, name, pct, max, extra) {
   return ok(s.api(s.T1, 'score.saveType', Object.assign({ courseId: s.cid, name, pct, max }, extra || {}))).typeId;
 }
+test('สอบกลางภาค/ปลายภาค: สร้างด้วย cat · ชื่อ/เต็ม 100 คงที่ · ค่าเริ่มต้นไม่แสดงนักศึกษา · ซ้ำไม่ได้ · import เป็น % (เกิน 100 ถูกข้าม)', () => {
+  const s = scoreWorld();
+  const r = ok(s.api(s.T1, 'score.saveType', { courseId: s.cid, cat: 'mid', pct: 20, name: 'อะไรก็ได้', max: 5 }));
+  const t = r.types.filter(x => x.typeId === r.typeId)[0];
+  assert.strictEqual(t.name, 'สอบกลางภาค'); assert.strictEqual(t.max, 100); assert.strictEqual(t.cat, 'mid');
+  assert.strictEqual(t.visible, false); assert.strictEqual(t.auto, false);
+  assert.strictEqual(code(s.api(s.T1, 'score.saveType', { courseId: s.cid, cat: 'mid', pct: 5 })), 'E_SCORE_TYPE');
+  assert.strictEqual(code(s.api(s.T1, 'score.saveType', { courseId: s.cid, cat: 'xx', pct: 5 })), 'E_SCORE_TYPE');
+  const f = ok(s.api(s.T1, 'score.saveType', { courseId: s.cid, cat: 'final', pct: 30 }));
+  assert.strictEqual(f.types.filter(x => x.typeId === f.typeId)[0].cat, 'final');
+  assert.strictEqual(code(s.api(s.T1, 'score.saveType', { courseId: s.cid, cat: 'final', pct: 60 })), 'E_SCORE_TYPE');   // ซ้ำก่อนเรื่องน้ำหนัก
+  const e = ok(s.api(s.T1, 'score.saveType', { courseId: s.cid, typeId: r.typeId, pct: 25, name: 'เปลี่ยนชื่อ', max: 9 })).types.filter(x => x.typeId === r.typeId)[0];
+  assert.strictEqual(e.pct, 25); assert.strictEqual(e.name, 'สอบกลางภาค', 'ชื่อ/เต็มแก้ไม่ได้'); assert.strictEqual(e.max, 100);
+  const std1 = ok(s.api(s.T1, 'score.table', { courseId: s.cid })).students.map(x => x.stdId);
+  const res = ok(s.api(s.T1, 'score.saveBulk', { courseId: s.cid, typeId: r.typeId, rows: [{ stdId: std1[0], score: 80 }, { stdId: std1[1], score: 101 }] }));
+  assert.strictEqual(res.saved, 1); assert.strictEqual(res.skippedCount, 1);
+  const tb = ok(s.api(s.T1, 'score.table', { courseId: s.cid }));
+  assert.strictEqual(tb.students[0].pcts[r.typeId], 80); assert.strictEqual(tb.students[0].total, 20);   // 80% × น้ำหนัก 25 = 20
+});
 test('saveType: สร้าง/ตัดช่องว่าง · listTypes แสดงน้ำหนักรวมและที่เหลือ', () => {
   const s = scoreWorld();
   mkType(s, '  สอบ  กลางภาค ', 30, 50); mkType(s, 'รายงาน', 20.5, 10);

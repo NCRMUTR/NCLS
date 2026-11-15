@@ -1,4 +1,4 @@
-# ขั้นตอนที่คุณต้องทำเอง — ติดตั้ง HBT Teaching System (v0.6.3) แบบ Git + clasp + Claude Desktop
+# ขั้นตอนที่คุณต้องทำเอง — ติดตั้ง HBT Learning System (v0.6.3) แบบ Git + clasp + Claude Desktop
 
 เอกสารนี้รวม **เฉพาะสิ่งที่ Claude ทำแทนคุณไม่ได้** เรียงตามลำดับ ทำจากบนลงล่าง ส่วนที่ Claude ทำให้ (รันเทสต์, git, clasp, แก้ไฟล์ตั้งค่า) อยู่ใน `CLAUDE.md` ซึ่ง Claude อ่านเอง
 
@@ -92,13 +92,13 @@ Claude จะเริ่มที่ S0 (ตรวจว่า A1–A5 เร�
 **E1 สร้างโปรเจกต์ Google Cloud**
 - [ ] เข้า https://console.cloud.google.com ด้วยบัญชี **@rmutr.ac.th**
 - [ ] แถบบนสุดกดชื่อโปรเจกต์ (ถ้าเพิ่งเริ่มขึ้นว่า *Select a project*) → **New project**
-- [ ] **Project name:** `HBT Teaching` → **Create**
+- [ ] **Project name:** `HBT Learning System` → **Create**
 - [ ] รอสักครู่ แล้วกดชื่อโปรเจกต์แถบบนอีกครั้ง **สลับเข้าโปรเจกต์ที่เพิ่งสร้าง** (ขั้นที่คนลืมบ่อย ถ้าไม่สลับจะไปสร้าง Client ผิดโปรเจกต์)
 - ไม่ต้องผูกบัตรเครดิต
 
 **E2 ตั้งหน้าจอขอความยินยอม (ครั้งเดียว)** — ปัจจุบันอยู่ใต้ **Google Auth Platform** (ชื่อเดิม: APIs & Services → OAuth consent screen)
 - [ ] เมนูซ้าย (ขีดสามขีดมุมบนซ้าย) → **Google Auth Platform** → **Branding** → ถ้าขึ้นว่ายังไม่ได้ตั้งค่า กด **Get started**
-- [ ] **App Information:** *App name* `HBT Teaching System` · *User support email* เลือกอีเมลตัวเอง
+- [ ] **App Information:** *App name* `HBT Learning System` · *User support email* เลือกอีเมลตัวเอง
 - [ ] **Audience:** เลือก **Internal** ถ้ามีให้เลือก
   - Internal = ใช้ได้เฉพาะบัญชี @rmutr.ac.th ไม่ต้องส่ง Google ตรวจแอป ไม่จำกัดจำนวนผู้ใช้ — เหมาะกับระบบนี้ที่สุด
   - ถ้าไม่มี Internal ให้เลือก **External** แล้วต้องเพิ่มอาจารย์ทุกคนเป็น Test users (E3) จำกัด 100 บัญชี
@@ -145,7 +145,7 @@ Claude จะเริ่มที่ S0 (ตรวจว่า A1–A5 เร�
 - [ ] **F8** บอก Claude: `setupCore ผ่าน setupCheck ผ่านแล้ว` → Claude จะ deploy (`clasp create-deployment`) แล้วให้ **Core URL**
 - [ ] **F9 ตรวจ deployment:** ในตัวแก้ไข **Deploy** → **Manage deployments** ต้องเห็น Web app ที่ **Execute as: Me** และ **Who has access: Anyone** (ไม่ใช่ *Anyone with Google account*) — ค่านี้มาจาก `appsscript.json` ถ้าไม่ตรงบอก Claude
 - [ ] **F10** จด Core URL ลงช่อง #4 (ลงท้าย `/exec`) แล้วลองเปิดในเบราว์เซอร์ ต้องเห็นข้อความ JSON ที่มีเลขเวอร์ชัน (ปัจจุบัน `0.6.0`) และไม่มีค่าลับใดๆ
-- [ ] **F11** ไปที่ Google Drive จะมีชีต `HBT_Core — HBT Teaching System` เพิ่มขึ้นมา **อย่าแก้ข้อมูลในชีตโดยตรง** ห้ามเปลี่ยนชื่อ/ลำดับคอลัมน์ ห้ามลบแผ่นงาน
+- [ ] **F11** ไปที่ Google Drive จะมีชีต `HBT_Core — HBT Learning System` เพิ่มขึ้นมา **อย่าแก้ข้อมูลในชีตโดยตรง** ห้ามเปลี่ยนชื่อ/ลำดับคอลัมน์ ห้ามลบแผ่นงาน
 
 > ถ้าไม่ใช้ระบบสอบออนไลน์ ข้ามขั้น G ไปขั้น H ได้เลย
 

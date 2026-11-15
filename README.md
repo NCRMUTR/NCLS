@@ -133,7 +133,7 @@ hbt-teaching-system/
    - Execute as: **Me**
    - Who has access: **Anyone**  (ต้องเป็นแบบนี้ เพราะนักศึกษา/เว็บภายนอกต้องเรียกได้ — สิทธิ์จริงตรวจในโค้ดด้วย token)
    - คัดลอก **Web app URL** (ลงท้าย `/exec`)
-7. ไฟล์ฐานข้อมูล (Google Sheet ชื่อ `HBT_Core — HBT Teaching System`) ถูกสร้างในไดรฟ์ของคุณ — **อย่าแก้ข้อมูลตรงๆ ในชีต** ให้ผ่านหน้าเว็บ
+7. ไฟล์ฐานข้อมูล (Google Sheet ชื่อ `HBT_Core — HBT Learning System`) ถูกสร้างในไดรฟ์ของคุณ — **อย่าแก้ข้อมูลตรงๆ ในชีต** ให้ผ่านหน้าเว็บ
 
 > แก้โค้ดภายหลัง: Deploy → **Manage deployments → ✏️ → Version: New version → Deploy** (URL เดิม ไม่เปลี่ยน)  
 > ถ้าไม่ทำ เว็บจะยังเรียกโค้ดเวอร์ชันเก่า

@@ -24,7 +24,7 @@ HBT.page({ active: 'exam', need: 'exam', crumbs: [['รายวิชาขอ�
 
   function shell() {
     var r = round;
-    document.title = r.title + ' — HBT Teaching';
+    document.title = r.title + ' — HBT Learning System';
     var syncTxt = r.scoreMode === 'NONE' ? '<span class="pill">ไม่บันทึกคะแนนเข้ารายวิชา</span>' :
       (r.sync.state === 'OK' ? '<span class="pill good">ซิงก์คะแนนแล้ว</span>' : r.sync.state === 'ERR' ? '<span class="pill bad">ซิงก์ไม่สำเร็จ</span>' : '<span class="pill info">จะซิงก์เมื่อปิดรอบ</span>');
     $('#box').innerHTML =

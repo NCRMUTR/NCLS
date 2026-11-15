@@ -68,7 +68,7 @@
       step('ข้อสอบ');
       return examParts(id, z, notes, put);
     }).then(function () {
-      var L = ['HBT Teaching System — สำรองข้อมูลวิชา', '',
+      var L = ['HBT Learning System — สำรองข้อมูลวิชา', '',
         'วิชา: ' + course.code + ' ' + course.name + ' กลุ่ม ' + course.section, 'ภาคเรียน: ' + (course.termName || '-'),
         'สร้างเมื่อ: ' + new Date().toLocaleString('th-TH'), '', 'ไฟล์ในชุดนี้:'];
       notes.files.forEach(function (f) { L.push('  - ' + f); });
@@ -199,7 +199,7 @@
             }, function (e) { errs.push(f.path + ' — ' + HBT.errMsg(e)); n++; });
           });
           return p.then(function () {
-            var L = ['HBT Teaching System — ไฟล์งานที่นักศึกษาส่ง', '', 'งาน: ' + asg.title + ' (รหัส ' + asg.code + ')', 'วิชา: ' + course.code + '-' + course.section,
+            var L = ['HBT Learning System — ไฟล์งานที่นักศึกษาส่ง', '', 'งาน: ' + asg.title + ' (รหัส ' + asg.code + ')', 'วิชา: ' + course.code + '-' + course.section,
               'ส่วนที่ ' + (i + 1) + ' จาก ' + total + ' (' + list.length + ' ไฟล์)', 'submissions.csv = รายการส่ง/คะแนน/ความเห็น (ทุกส่วนมีไฟล์นี้ไฟล์เดียวกัน)'];
             if (errs.length) { L.push('', 'ดึงไฟล์ไม่สำเร็จ ' + errs.length + ' ไฟล์:'); errs.forEach(function (e) { L.push('  - ' + e); }); }
             root.file('README.txt', readme(L));

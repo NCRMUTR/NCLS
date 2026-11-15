@@ -16,7 +16,7 @@
   }
 
   function head(sub) {
-    return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Teaching</a><h1>ส่งงาน</h1>' + (sub || '') + '</div>';
+    return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Learning System</a><h1>ส่งงาน</h1>' + (sub || '') + '</div>';
   }
   function foot() {
     var s = S.sess();
@@ -119,8 +119,9 @@
   function statusBanner(t) {
     var a = t.asg, h;
     if (t.graded) h = '<div class="callout good" id="stBanner"><b>อาจารย์ตรวจแล้ว</b>' + (t.grade ? ' — คะแนน <b class="num">' + esc(t.grade.score) + '</b> / ' + esc(a.maxScore) + (t.grade.feedback ? '<br>ความเห็น: ' + esc(t.grade.feedback) : '') : ' (อาจารย์ยังไม่เปิดให้ดูคะแนน)') + '</div>';
-    else if (a.phase === 'closed') h = '<div class="callout bad" id="stBanner"><b>ปิดรับงานแล้ว</b>' + (t.sub ? '<br>งานที่ส่งไว้ยังอยู่ครบ' : '<br>คุณยังไม่ได้ส่งงานนี้ — แจ้งอาจารย์หากมีเหตุจำเป็น') + '</div>';
-    else if (t.sub) h = '<div class="callout good" id="stBanner"><b>ส่งแล้ว</b> เมื่อ ' + esc(fmt(t.sub.updatedAt)) + (t.sub.late ? ' <span class="pill warn">ส่งช้า</span>' : '') + (t.canEdit ? '<br>แก้ไข/เพิ่ม/ลบไฟล์ได้จนกว่างานจะปิดหรืออาจารย์ให้คะแนน' : '') + '</div>';
+    else if (a.phase === 'closed') h = '<div class="callout bad" id="stBanner"><b>ปิดรับงานแล้ว</b>' + (t.submitted ? '<br>งานที่ส่งไว้ยังอยู่ครบ' : '<br>คุณยังไม่ได้ส่งงานนี้ — แจ้งอาจารย์หากมีเหตุจำเป็น') + '</div>';
+    else if (t.sub && !t.submitted) h = '<div class="callout warn" id="stBanner"><b>ยังไม่ถือว่าส่งงาน</b> — งานนี้ต้องแนบไฟล์ (ข้อความ/ลิงก์ที่บันทึกไว้ยังอยู่ แต่ต้องอัปโหลดไฟล์อย่างน้อย 1 ไฟล์)</div>';
+    else if (t.submitted) h = '<div class="callout good" id="stBanner"><b>ส่งแล้ว</b> เมื่อ ' + esc(fmt(t.sub.updatedAt)) + (t.sub.late ? ' <span class="pill warn">ส่งช้า</span>' : '') + (t.canEdit ? '<br>แก้ไข/เพิ่ม/ลบไฟล์ได้จนกว่างานจะปิดหรืออาจารย์ให้คะแนน' : '') + '</div>';
     else if (a.phase === 'late') h = '<div class="callout warn" id="stBanner"><b>เลยกำหนดส่งแล้ว</b> — ส่งตอนนี้ระบบจะบันทึกว่า “ส่งช้า”</div>';
     else h = '<div class="callout" id="stBanner">ยังไม่ได้ส่งงาน</div>';
     return h;
@@ -252,10 +253,11 @@
     h += '<ul class="stack-s" id="log" style="list-style:none;margin:0;padding:0" aria-live="polite">' + st.log.map(function (l) {
       return '<li class="small ' + (l.s === 'bad' ? 'err' : l.s === 'ok' ? '' : 'muted') + '">' + (l.s === 'ok' ? '✓ ' : l.s === 'bad' ? '✗ ' : l.s === 'run' ? '… ' : '· ') + esc(l.name) + (l.msg ? ' — ' + esc(l.msg) : '') + '</li>';
     }).join('') + '</ul>';
+    if (a.requireFile && !files.length) h += '<div class="callout info small" id="needFile"><b>งานนี้ต้องแนบไฟล์</b> — กด “เลือกไฟล์ / ถ่ายรูป” อย่างน้อย 1 ไฟล์ จึงจะนับว่าส่งแล้ว</div>';
     h += '<div class="field"><label for="note">ข้อความถึงอาจารย์ (ไม่บังคับ)</label><textarea id="note" maxlength="2000" rows="3"' + (st.uploading ? ' disabled' : '') + '></textarea></div>' +
       '<div class="field"><label for="link">ลิงก์งาน เช่น Google Drive (ไม่บังคับ)</label><input id="link" type="url" inputmode="url" maxlength="500" autocomplete="off" placeholder="https://" ' + (st.uploading ? 'disabled' : '') + '></div>' +
       '<div class="err" id="nerr" role="alert"></div><button class="btn block" id="nsave" type="button"' + (st.uploading ? ' disabled' : '') + '>บันทึกข้อความ / ลิงก์</button>' +
-      '<p class="small muted">ไฟล์ที่อัปโหลดถือว่า <b>ส่งแล้วทันที</b> · ข้อความ/ลิงก์ต้องกดบันทึก</p>';
+      '<p class="small muted">ไฟล์ที่อัปโหลดถือว่า <b>ส่งแล้วทันที</b> · ข้อความ/ลิงก์ต้องกดบันทึก' + (a.requireFile ? '' : ' · งานนี้ไม่บังคับแนบไฟล์ ส่งเป็นข้อความ/ลิงก์อย่างเดียวได้') + '</p>';
     box.innerHTML = h;
     $('#note').value = st.draft.note; $('#link').value = st.draft.link;
     $('#note').addEventListener('input', function () { st.draft.note = this.value; });

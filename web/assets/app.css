@@ -1,5 +1,5 @@
 
-/* HBT Teaching System prototype — tokens first. Layout: sidebar app for staff, single column for students. */
+/* HBT Learning System prototype — tokens first. Layout: sidebar app for staff, single column for students. */
 :root{
  --sans:"Noto Sans Thai","Sarabun",system-ui,-apple-system,"Segoe UI",sans-serif;
  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -8,13 +8,16 @@
  --good:#166534;--good-soft:#DAF2E1;--warn:#8A4B07;--warn-soft:#FCEBCB;--bad:#A8261B;--bad-soft:#FCE1DE;
  --info:#1E4FA8;--info-soft:#DCE8FA;--adm:#5B3FB5;--adm-soft:#E7E1F8;
  --shadow:0 1px 2px rgba(19,39,42,.06),0 4px 14px rgba(19,39,42,.05);
+ --c-att:#2563EB;--c-asg:#15803D;--c-exam:#D97706;--c-mid:#7C3AED;--c-final:#DB2777;--c-other:#6B7F82;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
  --bg:#0B1618;--surface:#112225;--surface2:#183034;--line:#27403F;--fg:#E3EEEE;--muted:#93ADB0;
  --accent:#3CC3B3;--accent-fg:#04201D;--accent-soft:#123A36;--accent-line:#216059;
  --good:#7EDB9B;--good-soft:#12331F;--warn:#F2B866;--warn-soft:#3A290D;--bad:#FF9A90;--bad-soft:#3C1714;
- --info:#97BBF7;--info-soft:#15294B;--adm:#BDAAF6;--adm-soft:#292248;--shadow:none;color-scheme:dark}}
+ --info:#97BBF7;--info-soft:#15294B;--adm:#BDAAF6;--adm-soft:#292248;--shadow:none;color-scheme:dark;
+ --c-att:#60A5FA;--c-asg:#4ADE80;--c-exam:#FBBF24;--c-mid:#A78BFA;--c-final:#F472B6;--c-other:#93ADB0}}
 :root[data-theme="dark"]{
+ --c-att:#60A5FA;--c-asg:#4ADE80;--c-exam:#FBBF24;--c-mid:#A78BFA;--c-final:#F472B6;--c-other:#93ADB0;
  --bg:#0B1618;--surface:#112225;--surface2:#183034;--line:#27403F;--fg:#E3EEEE;--muted:#93ADB0;
  --accent:#3CC3B3;--accent-fg:#04201D;--accent-soft:#123A36;--accent-line:#216059;
  --good:#7EDB9B;--good-soft:#12331F;--warn:#F2B866;--warn-soft:#3A290D;--bad:#FF9A90;--bad-soft:#3C1714;
@@ -210,6 +213,16 @@ td.num,th.num{text-align:right;font-family:var(--mono);white-space:nowrap}
 .bar-wrap{height:10px;border-radius:99px;background:var(--surface2);overflow:hidden;border:1px solid var(--line)}
 .bar-wrap>i{display:block;height:100%;background:var(--accent)}
 .bar-wrap.full>i{background:var(--good)}
+/* แถบสัดส่วนคะแนนแบ่งสีตามประเภท (หน้าคะแนน) */
+.bar-stack{display:flex;height:16px;border-radius:99px;background:var(--surface2);overflow:hidden;border:1px solid var(--line)}
+.bar-stack>i{display:block;height:100%;min-width:2px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px}
+.legend .lg{display:inline-flex;align-items:center;gap:6px;font-size:.85rem}
+.legend .dot,.dot{display:inline-block;width:11px;height:11px;border-radius:3px;flex:none}
+.cat-att{--c:var(--c-att)}.cat-asg{--c:var(--c-asg)}.cat-exam{--c:var(--c-exam)}.cat-mid{--c:var(--c-mid)}.cat-final{--c:var(--c-final)}.cat-other{--c:var(--c-other)}
+.catpill{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;padding:1px 8px;border-radius:99px;border:1px solid var(--c);color:var(--fg)}
+.catpill:before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c)}
+th.catcol{border-top:3px solid var(--c)}
 textarea{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);resize:vertical}
 textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 input[type=file]{font:inherit;max-width:100%}

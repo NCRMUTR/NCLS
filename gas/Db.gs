@@ -128,7 +128,8 @@ var Db = (function () {
         ['asg_id', T.TEXT, 170], ['course_id', T.TEXT, 170], ['code', T.TEXT, 100], ['title', T.TEXT, 260], ['description', T.TEXT, 420],
         ['kind', T.TEXT, 80], ['max_score', T.NUM, 90], ['due_at', T.TEXT, 150], ['late_ok', T.BOOL, 80], ['close_at', T.TEXT, 150],
         ['status', T.TEXT, 80], ['max_group', T.INT, 90], ['show_grades', T.BOOL, 90], ['link_url', T.TEXT, 300], ['folder_id', T.TEXT, 240],
-        ['created_by', T.TEXT, 220], ['created_at', T.DATETIME, 160], ['updated_at', T.DATETIME, 160]
+        ['created_by', T.TEXT, 220], ['created_at', T.DATETIME, 160], ['updated_at', T.DATETIME, 160],
+        ['require_file', T.BOOL, 100]       // v0.7.0 (ต่อท้ายเสมอ — ห้ามแทรกกลางตาราง) · ว่าง = ต้องแนบไฟล์ (ค่าเริ่มต้น)
       ]
     },
     AsgGroups: {                      // งานกลุ่ม: 1 กลุ่ม = ตัวแทน 1 คน + สมาชิก (ดู AsgMembers)
@@ -167,7 +168,7 @@ var Db = (function () {
   };
 
   var FORMAT = { TEXT: '@', JSON: '@', DATETIME: '@', BOOL: '@', NUM: '0.##', INT: '0' };
-  var SCHEMA_VERSION = '0.6.0';
+  var SCHEMA_VERSION = '0.7.0';
 
   var _ss = null, _checked = false, _cache = {}, _props = null, _idx = {};
 

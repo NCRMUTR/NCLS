@@ -44,7 +44,7 @@
     }
     return '<header class="topbar"><div class="row">' +
       '<button class="btn sm menu-btn" type="button" id="menuBtn" aria-label="เมนู" aria-expanded="false" aria-controls="side">เมนู</button>' +
-      '<a class="brand" href="' + root + 't/home.html"><span class="mark">H</span>HBT Teaching</a>' +
+      '<a class="brand" href="' + root + 't/home.html"><span class="mark">H</span>HBT Learning System</a>' +
       '<span class="pill ' + (adm ? 'adm' : 'acc') + '">' + (adm ? 'ผู้ดูแลระบบ' : 'อาจารย์') + '</span></div>' +
       '<div class="row"><div class="who"><span class="avatar"' + (adm ? ' style="background:var(--adm-soft);color:var(--adm)"' : '') + '>' + initial + '</span>' +
       '<span class="small" id="whoEmail">' + esc(u.email) + '</span></div>' +

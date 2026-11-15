@@ -4,7 +4,7 @@
  **************************************************************/
 
 var APP = {
-  NAME: 'HBT Teaching System',
+  NAME: 'HBT Learning System',
   VERSION: '0.6.0',
   TZ: 'Asia/Bangkok',
   SYSTEMS: ['att', 'exam', 'asg'],           // ระบบที่กำหนดสิทธิ์ให้อาจารย์ได้

@@ -36,7 +36,7 @@ HBT.page({ active: 'exam', need: 'exam', crumbs: [['รายวิชาขอ�
 
   function render() {
     var z = data.quiz, qs = data.questions;
-    document.title = z.title + ' — HBT Teaching';
+    document.title = z.title + ' — HBT Learning System';
     var h = '<div class="page-h"><div class="stack-s"><h1>' + esc(z.title) + '</h1><p class="muted">' + qs.length + ' ข้อ · คะแนนรวม ' + qs.reduce(function (a, x) { return a + x.score; }, 0) + '</p></div>' +
       '<div class="row"><a class="btn" href="' + back + '">‹ แบบทดสอบ</a><button class="btn primary" type="button" id="addQ">เพิ่มข้อสอบ</button></div></div>';
     h += '<div class="row"><button class="btn sm" type="button" id="impBtn">นำเข้า CSV</button><button class="btn sm" type="button" id="expBtn"' + (qs.length ? '' : ' disabled') + '>ส่งออก CSV</button>' +

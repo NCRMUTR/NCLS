@@ -11,7 +11,7 @@
   }
 
   app.innerHTML =
-    '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Teaching</a>' +
+    '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Learning System</a>' +
     '<h1>ตั้ง / เปลี่ยน PIN</h1><p class="muted">PIN 4 หลักของคุณใช้ยืนยันตัวตนตอนเช็คชื่อ ส่งงาน และทำข้อสอบ — ใช้ร่วมกันทุกวิชา</p></div>' +
     '<section class="card stack" id="pick"><h2>คุณคือใคร</h2>' +
     '<div class="field"><label for="selT">อาจารย์ผู้สอน</label><select id="selT"><option value="">กำลังโหลด…</option></select></div>' +

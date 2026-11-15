@@ -64,7 +64,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     var c = data.course;
     $('#head').innerHTML = '<div class="page-h"><div class="stack-s"><h1>นักศึกษา</h1><p>' + esc(c.code) + ' กลุ่ม ' + esc(c.section) + ' · ' + esc(c.name) + '</p></div>' +
       '<div class="row"><a class="btn sm" id="backCourse" href="' + root + 't/course.html?id=' + encodeURIComponent(id) + '">‹ กลับรายวิชา</a></div></div>' + counts();
-    document.title = 'นักศึกษา ' + c.code + ' — HBT Teaching';
+    document.title = 'นักศึกษา ' + c.code + ' — HBT Learning System';
   }
 
   function renderList() {

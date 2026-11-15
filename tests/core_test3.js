@@ -386,7 +386,7 @@ function scoreOf(s, i) {
   const ty = t.types.filter(x => x.source === 'ATT')[0];
   return { ty, v: ty ? t.students.filter(x => x.stdId === std(i))[0].scores[ty.typeId] : undefined };
 }
-test('คะแนนเช็คชื่อ = (ปกติ1 สาย0.5 ลา1 ขาด0) ÷ จำนวนคาบที่ปิด ×100 · ประเภท ATT น้ำหนักเริ่ม 0 · แก้มือไม่ได้', () => {
+test('คะแนนเช็คชื่อ = (ปกติ1 สาย0.5 ลา0 ขาด0) ÷ จำนวนคาบที่ปิด ×100 · ประเภท ATT น้ำหนักเริ่ม 0 · แก้มือไม่ได้', () => {
   const s = world();
   const o1 = open(s); first(s, o1.sessionId, 1, 1); first(s, o1.sessionId, 2, 2); first(s, o1.sessionId, 3, 3);
   assert.strictEqual(s.rows('ScoreTypes').length, 0, 'คาบยังเปิด = ยังไม่คิดคะแนน');
@@ -397,7 +397,7 @@ test('คะแนนเช็คชื่อ = (ปกติ1 สาย0.5 ล�
   ok(s.api(s.T1, 'att.close', { sessionId: o2.sessionId }));
   const a = scoreOf(s, 1), b = scoreOf(s, 2), c = scoreOf(s, 3), d = scoreOf(s, 4);
   assert.strictEqual(a.ty.pct, 0); assert.strictEqual(a.ty.max, 100);
-  assert.strictEqual(a.v, 75); assert.strictEqual(b.v, 50); assert.strictEqual(c.v, 100); assert.strictEqual(d.v, 0);
+  assert.strictEqual(a.v, 75); assert.strictEqual(b.v, 50); assert.strictEqual(c.v, 50, 'ปกติ 1 คาบ + ลา 1 คาบ (ลาไม่นับ) = 50'); assert.strictEqual(d.v, 0);
   assert.strictEqual(code(s.api(s.T1, 'score.saveBulk', { courseId: s.cid, typeId: a.ty.typeId, rows: [{ stdId: std(1), score: 5 }] })), 'E_SCORE_AUTO');
   assert.strictEqual(code(s.api(s.T1, 'score.deleteType', { courseId: s.cid, typeId: a.ty.typeId })), 'E_SCORE_AUTO');
   const rp = ok(s.api(s.T1, 'att.report', { courseId: s.cid }));

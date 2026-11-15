@@ -16,7 +16,7 @@
 
 var Attendance = (function () {
 
-  var SCORE = { normal: 1, late: 0.5, leave: 1 };
+  var SCORE = { normal: 1, late: 0.5, leave: 0 };      // คะแนนเข้าเรียน: ปกติ 1 · สาย 0.5 · ลา/ขาด 0
   var STATUSES = ['normal', 'late', 'leave'];
   var APPROVE_WAIT_MIN = 2;        // คำขออนุมัติรอได้กี่นาที
   var APPROVE_VALID_MIN = 5;       // อนุมัติแล้วใช้ได้กี่นาที

@@ -33,9 +33,20 @@ var Scores = (function () {
       return d !== 0 ? d : (a.created_at < b.created_at ? -1 : 1);
     });
   }
+  /** หมวดคะแนน 5 แบบ: att เข้าเรียน · asg คะแนนเก็บ(งาน) · exam คะแนนทดสอบ · mid กลางภาค · final ปลายภาค (other = ประเภทกรอกเองแบบเดิม) */
+  var FIXED = { mid: { ref: 'MID', name: 'สอบกลางภาค' }, final: { ref: 'FINAL', name: 'สอบปลายภาค' } };
+  function fixedRef_(r) { return r.source === 'MANUAL' && (r.source_ref === 'MID' || r.source_ref === 'FINAL'); }
+  function catOf_(r) {
+    if (r.source === 'ATT') return 'att';
+    if (r.source === 'ASSIGN') return 'asg';
+    if (r.source === 'EXAM') return 'exam';
+    if (r.source_ref === 'MID') return 'mid';
+    if (r.source_ref === 'FINAL') return 'final';
+    return 'other';
+  }
   function typeOut_(r) {
     return {
-      typeId: r.type_id, name: r.name, pct: Number(r.pct), max: Number(r.max_score),
+      typeId: r.type_id, name: r.name, pct: Number(r.pct), max: Number(r.max_score), cat: catOf_(r),
       source: r.source, sourceRef: r.source_ref, visible: U.bool(r.visible), auto: r.source !== 'MANUAL'
     };
   }
@@ -63,10 +74,14 @@ var Scores = (function () {
     var pct = parseNum_(a.pct);
     if (isNaN(pct) || pct < 0 || pct > 100) throw U.E('E_SCORE_TYPE', { field: 'pct' }, 'น้ำหนักต้องเป็นตัวเลข 0–100');
     pct = r2_(pct);
-    var visible = a.visible === undefined ? (ex ? U.bool(ex.visible) : true) : U.bool(a.visible);
+    var visible = a.visible === undefined ? (ex ? U.bool(ex.visible) : false) : U.bool(a.visible);   // ค่าเริ่มต้น: ไม่แสดงให้นักศึกษา
 
-    var name, max;
-    if (ex && ex.source !== 'MANUAL') {            // ประเภทอัตโนมัติ: แก้ได้แค่น้ำหนัก/การแสดง
+    var cat = a.cat ? String(a.cat) : '', name, max, ref = '';
+    if (!ex && cat) {                              // สร้างประเภทสอบกลางภาค/ปลายภาค (ชื่อ/คะแนนเต็มคงที่ = 100 → ค่าที่ import คือ %)
+      if (!FIXED[cat]) throw U.E('E_SCORE_TYPE', { field: 'cat' }, 'ประเภทคะแนนไม่ถูกต้อง');
+      if (types.some(function (t) { return t.source === 'MANUAL' && t.source_ref === FIXED[cat].ref; })) throw U.E('E_SCORE_TYPE', { field: 'cat' }, 'มีประเภทนี้อยู่แล้ว');
+      name = FIXED[cat].name; max = 100; ref = FIXED[cat].ref;
+    } else if (ex && (ex.source !== 'MANUAL' || fixedRef_(ex))) {   // ประเภทอัตโนมัติ/กลางภาค/ปลายภาค: แก้ได้แค่น้ำหนัก/การแสดง
       name = ex.name; max = Number(ex.max_score);
     } else {
       name = String(a.name === undefined || a.name === null ? '' : a.name).replace(/\s+/g, ' ').trim();
@@ -96,7 +111,7 @@ var Scores = (function () {
       out = U.uid('SCT');
       var sort = types.reduce(function (m, t) { return Math.max(m, Number(t.sort_no) || 0); }, 0) + 1;
       Db.insert('ScoreTypes', {
-        type_id: out, course_id: c.course_id, name: name, pct: pct, max_score: max, source: 'MANUAL', source_ref: '',
+        type_id: out, course_id: c.course_id, name: name, pct: pct, max_score: max, source: 'MANUAL', source_ref: ref,
         visible: U.bstr(visible), sort_no: sort, created_at: U.nowIso()
       });
     }
@@ -140,12 +155,13 @@ var Scores = (function () {
     var types = typesOf_(c.course_id);
     var rec = recordsOf_(c.course_id);
     var students = Students.roster(c.course_id).map(function (s) {
-      var sc = {};
+      var sc = {}, pc = {};
       types.forEach(function (t) {
         var v = rec[t.type_id + '|' + s.std_id];
         sc[t.type_id] = v === undefined ? null : v;
+        pc[t.type_id] = v === undefined ? null : r2_(v / Number(t.max_score) * 100);   // % ของรายการนั้น (หน้าคะแนนแสดงค่านี้)
       });
-      return { stdId: s.std_id, name: s.name, scores: sc, total: totalOf_(types, sc) };
+      return { stdId: s.std_id, name: s.name, scores: sc, pcts: pc, total: totalOf_(types, sc) };
     });
     var tot = totalPct_(types, '');
     return {
@@ -210,10 +226,10 @@ var Scores = (function () {
   function exportCsv(user, courseId) {
     var c = Courses.require(user, courseId);
     var tb = table(user, c.course_id);
-    var head = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล'].concat(tb.types.map(function (t) { return t.name + ' (เต็ม ' + t.max + ', น้ำหนัก ' + t.pct + '%)'; })).concat(['คะแนนรวม (%)']);
+    var head = ['รหัสนักศึกษา', 'ชื่อ-นามสกุล'].concat(tb.types.map(function (t) { return t.name + ' (% ของรายการ, สัดส่วน ' + t.pct + '%)'; })).concat(['คะแนนรวม (%)']);
     var rows = [head];
     tb.students.forEach(function (s) {
-      rows.push([s.stdId, s.name].concat(tb.types.map(function (t) { var v = s.scores[t.typeId]; return v === null ? '' : v; })).concat([s.total]));
+      rows.push([s.stdId, s.name].concat(tb.types.map(function (t) { var v = s.pcts[t.typeId]; return v === null ? '' : v; })).concat([s.total]));
     });
     var safe = (c.code + '-' + c.section).replace(/[^A-Za-z0-9ก-๙._-]+/g, '_');
     Audit.log(user.email, 'score.exportCsv', c.course_id, { rows: tb.students.length });
@@ -230,10 +246,34 @@ var Scores = (function () {
     var id = U.uid('SCT');
     var sort = typesOf_(courseId).reduce(function (m, t) { return Math.max(m, Number(t.sort_no) || 0); }, 0) + 1;
     Db.insert('ScoreTypes', {
-      type_id: id, course_id: courseId, name: d.name, pct: 0, max_score: d.max || 100, source: source, source_ref: String(sourceRef || ''),
-      visible: U.bstr(d.visible !== false), sort_no: sort, created_at: U.nowIso()
+      type_id: id, course_id: courseId, name: d.name, pct: d.pct || 0, max_score: d.max || 100, source: source, source_ref: String(sourceRef || ''),
+      visible: U.bstr(d.visible === true), sort_no: sort, created_at: U.nowIso()      // ค่าเริ่มต้น: ไม่แสดงให้นักศึกษา
     });
     return Db.byId('ScoreTypes', id);
+  }
+
+  /** ตรวจเฉยๆ ว่าตั้งสัดส่วน pct ให้รายการนี้ได้ไหม (น้ำหนักรวมไม่เกิน 100%) · ไม่ผ่าน = โยน E_SCORE_TYPE / E_SCORE_PCT */
+  function checkPct(courseId, pct, source, sourceRef) {
+    var p = parseNum_(pct);
+    if (isNaN(p) || p < 0 || p > 100) throw U.E('E_SCORE_TYPE', { field: 'pct' }, 'สัดส่วนต้องเป็นตัวเลข 0–100');
+    p = r2_(p);
+    var types = typesOf_(courseId), ex = source ? types.filter(function (t) { return t.source === source && t.source_ref === String(sourceRef || ''); })[0] : null;
+    var rest = totalPct_(types, ex ? ex.type_id : '');
+    if (rest + p > 100 + EPS) throw U.E('E_SCORE_PCT', { total: r2_(rest + p), remain: r2_(100 - rest) }, 'สัดส่วนรวมเกิน 100% (รายการนี้ใส่ได้อีกไม่เกิน ' + r2_(100 - rest) + '%)');
+    return p;
+  }
+  /** ตั้งสัดส่วน % ของประเภทอัตโนมัติ (เช่น งานแต่ละงาน) · ไม่มีประเภทอยู่ = ไม่ทำอะไร */
+  function setAutoPct(courseId, source, sourceRef, pct) {
+    var p = checkPct(courseId, pct, source, sourceRef);
+    var t = typesOf_(courseId).filter(function (x) { return x.source === source && x.source_ref === String(sourceRef || ''); })[0];
+    if (t) Db.update('ScoreTypes', t.type_id, { pct: p });
+    return p;
+  }
+  /** { sourceRef: pct } ของประเภทอัตโนมัติชนิดหนึ่งในวิชา (ใช้แสดงในรายการงาน) */
+  function pctMap(courseId, source) {
+    var m = {};
+    typesOf_(courseId).forEach(function (t) { if (t.source === source) m[t.source_ref] = Number(t.pct) || 0; });
+    return m;
   }
   function setRecords(courseId, typeId, rows, actor) {
     var t = Db.byId('ScoreTypes', typeId);
@@ -271,6 +311,6 @@ var Scores = (function () {
 
   return {
     listTypes: listTypes, saveType: saveType, deleteType: deleteType, table: table, saveBulk: saveBulk, exportCsv: exportCsv,
-    ensureType: ensureType, setRecords: setRecords, updateAuto: updateAuto, removeAuto: removeAuto, countForStudent: countForStudent, removeForStudents: removeForStudents
+    ensureType: ensureType, checkPct: checkPct, setAutoPct: setAutoPct, pctMap: pctMap, setRecords: setRecords, updateAuto: updateAuto, removeAuto: removeAuto, countForStudent: countForStudent, removeForStudents: removeForStudents
   };
 })();

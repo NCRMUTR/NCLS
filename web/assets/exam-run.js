@@ -116,7 +116,7 @@
   function violHtml() { return '<div class="ex-warn" id="violBar">ระบบบันทึกว่าคุณออกจากหน้าจอ ' + st.violations + ' ครั้ง</div>'; }
 
   /* ---------- โครงหน้า ---------- */
-  function head() { return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Teaching</a></div>'; }
+  function head() { return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Learning System</a></div>'; }
   function hero() {
     var c = st.res.course, s = st.res.session;
     return '<div class="ex-hero" id="hero"><div class="code">' + esc(c.code) + ' · กลุ่ม ' + esc(c.section) + '</div><h2>' + esc(s.title || c.name) + '</h2>' +

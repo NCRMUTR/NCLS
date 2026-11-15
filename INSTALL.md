@@ -1,4 +1,4 @@
-# คู่มือติดตั้ง HBT Teaching System v0.6.3 (ฉบับละเอียด — แบบวางไฟล์เอง)
+# คู่มือติดตั้ง HBT Learning System v0.6.3 (ฉบับละเอียด — แบบวางไฟล์เอง)
 
 > **แนะนำให้ใช้ `GUIDE_GIT.md` (Git + clasp) ก่อน** แบบนั้นไม่ต้องคัดลอกไฟล์ทีละไฟล์ และไม่มีปัญหาไฟล์หาย/วางไม่ครบ · เอกสารนี้ใช้เมื่อ clasp ใช้ไม่ได้ และเป็นที่มาของ **ตอนที่ 2 (OAuth Client ID)** กับ **ตอนที่ 7 (เช็กลิสต์ทดสอบ)** ที่ `GUIDE_GIT.md` อ้างถึง
 > ถ้าใช้ Pages ผ่าน GitHub Actions (GUIDE_GIT.md) ตอนที่ 1 ข้อ "Deploy from a branch" ให้ใช้ Source = **GitHub Actions** แทน
@@ -89,7 +89,7 @@ Origin ที่ต้องจด: https://somchai-rmutr.github.io
 
 1. เข้า <https://console.cloud.google.com> ด้วยบัญชี `@rmutr.ac.th`
 2. แถบบนสุด กดที่ชื่อโปรเจกต์ (ถ้าเพิ่งเริ่มจะขึ้นว่า *Select a project*) → **New project**
-3. **Project name**: `HBT Teaching` → กด **Create**
+3. **Project name**: `HBT Learning System` → กด **Create**
 4. รอสักครู่ แล้วกดที่ชื่อโปรเจกต์แถบบนอีกครั้งเพื่อ **สลับเข้าโปรเจกต์ที่เพิ่งสร้าง** (ขั้นนี้คนลืมบ่อย ถ้าไม่สลับจะไปสร้าง Client ผิดโปรเจกต์)
 5. ไม่ต้องผูกบัตรเครดิต การใช้งานแค่นี้ไม่มีค่าใช้จ่าย
 
@@ -100,7 +100,7 @@ Origin ที่ต้องจด: https://somchai-rmutr.github.io
 1. เมนูซ้ายมือ (ไอคอนขีดสามขีดมุมซ้ายบน) → เลื่อนหา **Google Auth Platform**
 2. เลือก **Branding** → ถ้าโปรเจกต์ใหม่จะขึ้นว่ายังไม่ได้ตั้งค่า ให้กด **Get started** (มุมขวาล่าง)
 3. กรอกตามหน้าจอ 4 ขั้น
-   - **App Information**: *App name* ใส่ `HBT Teaching System` · *User support email* เลือกอีเมลตัวเอง
+   - **App Information**: *App name* ใส่ `HBT Learning System` · *User support email* เลือกอีเมลตัวเอง
    - **Audience**: **เลือก Internal ถ้ามีให้เลือก**
      - *Internal* = ใช้ได้เฉพาะบัญชีในองค์กร `@rmutr.ac.th` ไม่ต้องส่ง Google ตรวจสอบแอป และ **ไม่จำกัดจำนวนผู้ใช้** — เหมาะกับระบบนี้ที่สุด
      - ถ้าไม่มี *Internal* ให้เลือก *External* แล้วต้องไปเพิ่มอาจารย์ทุกคนเป็น **Test users** ในขั้น 2.3 (จำกัด 100 บัญชี)
@@ -246,7 +246,7 @@ var SETUP = {
 
 ### 3.10 ไฟล์ฐานข้อมูล
 
-ไปที่ Google Drive ของคุณ จะมีไฟล์ชีตชื่อ `HBT_Core — HBT Teaching System` เพิ่มขึ้นมา
+ไปที่ Google Drive ของคุณ จะมีไฟล์ชีตชื่อ `HBT_Core — HBT Learning System` เพิ่มขึ้นมา
 
 - **ห้ามแก้ข้อมูลในชีตโดยตรง** ให้แก้ผ่านหน้าเว็บเท่านั้น
 - ห้ามเปลี่ยนชื่อคอลัมน์ ห้ามสลับลำดับคอลัมน์ ห้ามลบแผ่นงาน
@@ -366,7 +366,7 @@ cd web
 git init -b main
 git remote add origin https://github.com/<ชื่อผู้ใช้>/<repo>.git
 git add .
-git commit -m "HBT Teaching System v0.6.2"
+git commit -m "HBT Learning System v0.6.2"
 git push -u origin main --force
 ```
 

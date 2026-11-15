@@ -1,4 +1,4 @@
-# CLAUDE.md — คำสั่งประจำโปรเจกต์ HBT Teaching System (v0.6.3)
+# CLAUDE.md — คำสั่งประจำโปรเจกต์ HBT Learning System (v0.6.3)
 
 ไฟล์นี้อ่านโดย Claude ที่ทำงานในโฟลเดอร์นี้ (Claude Desktop / Claude Code) · ผู้ใช้คืออาจารย์ มทร.รัตนโกสินทร์ (@rmutr.ac.th) ใช้ภาษาไทย
 

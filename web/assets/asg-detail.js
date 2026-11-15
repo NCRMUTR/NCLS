@@ -122,7 +122,7 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
 
     h += '<hr style="border:0;border-top:1px solid var(--line);width:100%"><h3>ให้คะแนน <span class="muted small">(เต็ม ' + esc(A.maxScore) + ')</span></h3>';
     var first = u.members[0], allSame = u.members.every(function (m) { return m.score === first.score && m.feedback === first.feedback; });
-    h += '<div class="field"><label for="gScore">' + (group ? 'คะแนนทั้งกลุ่ม' : 'คะแนน') + '</label><input id="gScore" type="text" inputmode="decimal" autocomplete="off" value="' + esc(allSame && first.score !== null ? first.score : '') + '"></div>' +
+    h += '<div class="field"><label for="gScore">' + (group ? 'คะแนนทั้งกลุ่ม' : 'คะแนน') + '</label><input id="gScore" type="text" inputmode="decimal" autocomplete="off" value="' + esc(allSame && first.score !== null ? first.score : '') + '"><span class="help" id="gPct"></span></div>' +
       '<div class="field"><label for="gFb">ความเห็นถึงนักศึกษา (ไม่บังคับ)</label><textarea id="gFb" rows="2" maxlength="1000">' + esc(allSame ? first.feedback : '') + '</textarea></div>';
     if (group) {
       h += '<label class="check"><input type="checkbox" id="gEach"' + (allSame ? '' : ' checked') + '><span>ให้คะแนนสมาชิกแต่ละคนไม่เท่ากัน</span></label><div id="gMem" class="stack-s" ' + (allSame ? 'hidden' : '') + '>' +
@@ -133,6 +133,7 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
     h += '<div class="err" id="gErr" role="alert"></div><div class="row"><button class="btn primary" type="button" id="gSave">บันทึกคะแนน</button><button class="btn ghost" type="button" id="gClear">ล้างคะแนน</button></div>' +
       '<p class="small muted">คะแนนซิงก์เข้า “ตารางคะแนน” ประเภทงานนี้ทันที (น้ำหนักตั้งที่หน้าคะแนน) · นักศึกษาจะแก้งานไม่ได้เมื่อมีคะแนนแล้ว</p>';
     $('#uBody').innerHTML = h;
+    $('#gScore').addEventListener('input', pctHint); pctHint();
     if (group) $('#gEach').addEventListener('change', function () { $('#gMem').hidden = !this.checked; });
     HBT.$$('[data-view]', $('#uBody')).forEach(function (b) { b.addEventListener('click', function () { getFile(b, b.getAttribute('data-view'), true); }); });
     HBT.$$('[data-dl]', $('#uBody')).forEach(function (b) { b.addEventListener('click', function () { getFile(b, b.getAttribute('data-dl'), false); }); });
@@ -159,6 +160,15 @@ HBT.page({ active: 'asg', need: 'asg', crumbs: [['รายวิชาของ
     }).catch(function (e) { if (w) { try { w.close(); } catch (x) {} } HBT.toast(e.code === 'E_NOT_FOUND' ? 'ไม่พบไฟล์ใน Drive (อาจถูกลบ)' : HBT.errMsg(e), 'bad'); });
   }
 
+  /** ระบบคำนวณเป็น % ให้ทันทีที่กรอกคะแนน (บันทึกเข้าตารางคะแนนเป็น % ของงานนี้) */
+  function pctHint() {
+    var el = $('#gPct'); if (!el) return;
+    var s = parseScore($('#gScore').value);
+    if (s === '' ) { el.textContent = 'กรอกคะแนนที่ได้ (เต็ม ' + A.maxScore + ') ระบบคำนวณเป็น % ให้เอง'; return; }
+    if (s === null) { el.textContent = ''; return; }
+    var p = Math.round(s / Number(A.maxScore) * 10000) / 100, w = Number(A.pct) || 0;
+    el.textContent = '= ' + p + '% ของงานนี้' + (w ? ' → นับเป็น ' + (Math.round(p * w) / 100) + ' จาก ' + w + '% ของคะแนนรวม' : ' (ยังไม่ได้ตั้งสัดส่วนของงานนี้ — ตั้งที่ “แก้ไขงาน” หรือหน้าคะแนน)');
+  }
   function parseScore(v) {
     v = String(v).trim().replace(/,/g, '');
     if (v === '') return '';

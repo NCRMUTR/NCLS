@@ -35,7 +35,7 @@
   }
 
   function head() {
-    return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Teaching</a><h1>เช็คชื่อเข้าเรียน</h1></div>';
+    return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Learning System</a><h1>เช็คชื่อเข้าเรียน</h1></div>';
   }
   function opt(v, t) { return '<option value="' + esc(v) + '">' + esc(t) + '</option>'; }
   function mmss(sec) { sec = Math.max(0, Math.round(sec)); return (sec < 600 ? '0' : '') + Math.floor(sec / 60) + ':' + (sec % 60 < 10 ? '0' : '') + (sec % 60); }
