@@ -92,14 +92,14 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     });
   }
   $('#delGo').addEventListener('click', function () {
-    var b = this; delBusy = true; b.disabled = true; $('#delConfirm').disabled = true; $('#delErr').textContent = '';
-    HBT.busy(b, function () {
-      return delStep(0).then(function () {
-        HBT.toast('ลบรายวิชาแล้ว', 'good');
-        location.replace(root + 't/courses.html'); return new Promise(function () {});
-      });
+    var b = this; if (delBusy) return;
+    delBusy = true; $('#delConfirm').disabled = true; $('#delErr').textContent = ''; $('#delProg').textContent = 'กำลังลบ…';
+    var old = b.textContent; b.disabled = true; b.textContent = 'กำลังลบ…';
+    delStep(0).then(function () {
+      HBT.toast('ลบรายวิชาแล้ว', 'good');
+      location.replace(root + 't/courses.html');
     }).catch(function (e) {
-      delBusy = false; $('#delConfirm').disabled = false; $('#delGo').disabled = norm($('#delConfirm').value) !== norm(expect);
+      delBusy = false; b.textContent = old; $('#delProg').textContent = ''; $('#delConfirm').disabled = false; $('#delGo').disabled = norm($('#delConfirm').value) !== norm(expect);
       $('#delErr').textContent = HBT.errMsg(e) + (e.code === 'E_EXAM_DOWN' ? ' — ยังไม่ได้ลบอะไร' : e.code === 'E_RESET_CONFIRM' ? '' : ' — ข้อมูลที่ลบไปแล้วไม่กลับมา กดลบอีกครั้งเพื่อทำต่อ');
     });
   });
