@@ -78,7 +78,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
       '<div class="field"><label class="sr" for="sortSel">เรียงตาม</label><select id="sortSel">' +
       [['id', 'รหัสนักศึกษา'], ['name', 'ชื่อ-นามสกุล'], ['hi', 'คะแนนรวม มาก→น้อย'], ['lo', 'คะแนนรวม น้อย→มาก']].map(function (o) { return '<option value="' + o[0] + '"' + (st.sort === o[0] ? ' selected' : '') + '>เรียงตาม: ' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
       '<div class="row"><button class="btn" type="button" id="scaleBtn">เกณฑ์เกรด</button><button class="btn" type="button" id="expBtn">ส่งออก CSV</button></div></div>' +
-      '<p class="small muted">คลิกที่ตัวเลขในช่องใดก็ได้เพื่อแก้ · ช่องที่ระบบคิดให้ (เช็คชื่อ/งาน/สอบ) ที่อาจารย์แก้ทับจะมี ✎ และระบบไม่ทับให้อีก (กด “คืนค่าระบบ” เพื่อเลิกแก้) · คะแนนปรับ +/− บวกเข้าคะแนนรวม</p>' +
+      '<p class="small muted">คลิกที่ตัวเลขในช่องใดก็ได้เพื่อแก้ · ช่องที่ระบบคิดให้ (เช็คชื่อ/งาน/สอบ) ที่อาจารย์แก้ทับจะมี ✎ และระบบไม่ทับให้อีก (กด “คืนค่าระบบ” เพื่อเลิกแก้) · คะแนนปรับ +/− บวกเข้าคะแนนรวม · บรรทัดเล็กใต้ตัวเลข “= x%” คือ % ที่คิดได้ (คะแนนที่ได้ ÷ เต็ม × สัดส่วน) แก้ตรงนั้นไม่ได้ ให้แก้ที่คะแนน</p>' +
       '<div id="tbl"></div></div>';
     $('#q').addEventListener('input', function () { st.q = this.value; renderTable(); });
     $('#sortSel').addEventListener('change', function () { st.sort = this.value; renderTable(); });
@@ -99,7 +99,9 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
       return '<tr data-std="' + esc(s.stdId) + '"><td class="sticky-c mono">' + esc(s.stdId) + '</td><td>' + esc(s.name) + '</td>' + D.types.map(function (t) {
         var c = s.cells[t.typeId], tip = c.locked ? 'อาจารย์แก้ทับ' + (c.auto !== null ? ' · ค่าระบบ ' + c.auto : ' · ระบบยังไม่มีค่า') + (c.reason ? ' · ' + c.reason : '') : 'คลิกเพื่อแก้';
         return '<td class="num"><button class="sm-cell' + (c.locked ? ' lk' : '') + '" type="button" data-cell="' + esc(t.typeId) + '" title="' + esc(tip) + '" aria-label="แก้ ' + esc(t.name) + ' ของ ' + esc(s.name) + '">' +
-          (c.locked ? '✎ ' : '') + (c.v === null ? '<span class="muted">–</span>' : r2(c.v)) + '</button></td>';
+          (c.locked ? '✎ ' : '') + (c.v === null ? '<span class="muted">–</span>' : r2(c.v)) + '</button>' +
+          /* % ที่คิดได้ (ได้/เต็ม × สัดส่วน) — แสดงอย่างเดียว แก้ไม่ได้ ต้องแก้ที่คะแนน */
+          '<div class="sm-pct" title="คิดจาก ' + (c.v === null ? '–' : r2(c.v)) + ' / ' + t.max + ' × ' + t.pct + '% (แก้ไม่ได้ — แก้ที่คะแนนด้านบน)">' + (c.v === null || !(t.max > 0) ? '' : '= ' + r2(c.v / t.max * t.pct) + '%') + '</div></td>';
       }).join('') + '<td class="num">' + fmtN(s.base) + '</td>' +
         '<td class="num"><button class="sm-cell' + (s.adjust ? ' lk' : '') + '" type="button" data-adj="1" title="' + esc(s.adjust ? (s.adjust.reason || 'คะแนนปรับ') : 'คลิกเพื่อเพิ่มคะแนนปรับ') + '" aria-label="คะแนนปรับของ ' + esc(s.name) + '">' +
         (s.adjust ? (s.adjust.points > 0 ? '+' : '') + s.adjust.points : '<span class="muted">+/−</span>') + '</button></td>' +

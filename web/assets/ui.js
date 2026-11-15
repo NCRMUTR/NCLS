@@ -9,6 +9,10 @@
     });
   };
   HBT.$ = function (sel, root) { return (root || document).querySelector(sel); };
+  /** ค่า query string (ว่าง = ''): อยู่ใน ui.js เพื่อให้ทุกหน้าใช้ได้โดยไม่ต้องโหลด csv.js */
+  HBT.qs = function (k) {
+    try { return new URLSearchParams(location.search).get(k) || ''; } catch (e) { return ''; }
+  };
   HBT.$$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
 
   /* ---------- toast ---------- */

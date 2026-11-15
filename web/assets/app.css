@@ -256,6 +256,7 @@ th.lk-w,td.lk-w{width:36px;text-align:center}
 /* สรุปคะแนน: ช่องที่คลิกแก้ได้ · ช่องที่อาจารย์แก้ทับ */
 .sm-cell{border:0;background:transparent;font:inherit;color:inherit;cursor:pointer;min-width:44px;min-height:32px;padding:4px 8px;border-radius:8px;text-align:right}
 .sm-cell:hover{background:var(--accent-soft)}
+.sm-pct{font-size:.78rem;line-height:1.1;color:var(--muted);text-align:right;padding:0 8px 2px;min-height:.9rem;font-family:"IBM Plex Mono",monospace;cursor:default;user-select:none}
 .sm-cell.lk{background:var(--warn-soft);color:var(--warn);font-weight:600}
 .gr{font-size:1.02rem}
 tr.tfoot td{background:var(--surface2);font-size:.86rem}

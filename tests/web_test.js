@@ -67,6 +67,27 @@ const mk = () => L({ id: r => r.id, search: r => r.id + ' ' + r.n, sorts: [{ k: 
     ['students', 'exam', 'att', 'asg'].forEach(p => assert.ok(fs.readFileSync(path.join(__dirname, '..', 'web', 't', p + '.html'), 'utf8').includes('assets/listkit.js'), p));
   });
 
+  test('ทุกหน้า HTML โหลดสคริปต์ช่วย (listkit/csv/backup-lib) ครบตามที่สคริปต์ของหน้านั้นเรียกใช้', () => {
+    const root = path.join(__dirname, '..', 'web'), bad = [];
+    const need = { 'HBT.listKit': 'listkit.js', 'HBT.csv': 'csv.js', 'HBT.backup': 'backup-lib.js' };
+    const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.html') ? [path.join(d, e.name)] : []);
+    walk(root).forEach(h => {
+      const html = fs.readFileSync(h, 'utf8');
+      const loaded = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => path.basename(m[1]));
+      loaded.forEach(js => {
+        const f = path.join(dir, js); if (!fs.existsSync(f)) return;
+        if (['csv.js', 'listkit.js', 'backup-lib.js'].includes(js)) return;
+        const src = fs.readFileSync(f, 'utf8');
+        Object.keys(need).forEach(k => { if (src.includes(k) && !loaded.includes(need[k])) bad.push(path.relative(root, h) + ' ใช้ ' + k + ' ใน ' + js + ' แต่ไม่โหลด ' + need[k]); });
+      });
+    });
+    assert.deepStrictEqual(bad, []);
+  });
+  test('HBT.qs อยู่ใน ui.js (ไม่พึ่ง csv.js)', () => {
+    assert.ok(fs.readFileSync(path.join(dir, 'ui.js'), 'utf8').includes('HBT.qs = '));
+    assert.ok(!fs.readFileSync(path.join(dir, 'csv.js'), 'utf8').includes('HBT.qs = '));
+  });
+
   console.log('\n' + (fail ? '✘ มีข้อล้มเหลว ' + fail + ' ข้อ: ' + failures.join(' | ') : '✔ ผ่านทั้งหมด (' + pass + ' ผ่าน)'));
   process.exit(fail ? 1 : 0);
 })();

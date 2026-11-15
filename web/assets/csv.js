@@ -66,7 +66,4 @@
   }
 
   HBT.csv = { parse: parse, parseRoster: parseRoster, parseScores: parseScores, download: download, build: build };
-  HBT.qs = function (k) {
-    try { return new URLSearchParams(location.search).get(k) || ''; } catch (e) { return ''; }
-  };
 })();
