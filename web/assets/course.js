@@ -17,6 +17,15 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     '<div class="field"><label for="cs">กลุ่มเรียน</label><input id="cs" type="text" maxlength="10" autocomplete="off"></div>' +
     '<div class="err" id="mErr" role="alert"></div>' +
     '<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close type="button">ยกเลิก</button><button class="btn primary" type="button" id="saveBtn">บันทึก</button></div>' +
+    '</div></div>' +
+    '<div class="modal" id="mDel" hidden role="dialog" aria-modal="true" aria-labelledby="mDelT"><div class="mbox stack">' +
+    '<div class="row sp"><h2 id="mDelT">ลบรายวิชา</h2><button class="btn sm ghost" data-close type="button" id="delX">ปิด</button></div>' +
+    '<div class="callout bad"><b>ลบถาวร — ไม่มีถังขยะ กู้คืนไม่ได้</b><br>รายชื่อนักศึกษา · เช็คชื่อ · คะแนน · งานและไฟล์ใน Drive · ข้อสอบ ผลสอบ และรูป จะหายทั้งหมด และนักศึกษาจะเข้าวิชานี้ไม่ได้ทันที</div>' +
+    '<div id="delInfo"></div>' +
+    '<div class="field"><label for="delConfirm" id="delLbl">พิมพ์เพื่อยืนยัน</label><input id="delConfirm" type="text" autocomplete="off"></div>' +
+    '<div class="small muted" id="delProg" aria-live="polite"></div>' +
+    '<div class="err" id="delErr" role="alert"></div>' +
+    '<div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close type="button" id="delCancel">ยกเลิก</button><button class="btn danger" type="button" id="delGo" disabled>ลบรายวิชาถาวร</button></div>' +
     '</div></div>');
 
   function backupPill(c) {
@@ -49,12 +58,51 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
           return '<a class="card link-card" id="' + gid + '" href="' + root + page + '?id=' + q + '"><div class="row sp"><b>' + esc(HBT.SYSTEM_NAMES[s]) + '</b><span class="pill good">เปิดใช้</span></div><p class="small muted">' + esc(HBT.SYSTEM_DESC[s]) + '</p><span class="arrow">เปิด ›</span></a>';
         }
         return '<div class="card sys-off"><div class="row sp"><b>' + esc(HBT.SYSTEM_NAMES[s]) + '</b><span class="pill">ไม่มีสิทธิ์</span></div><p class="small muted">' + esc(HBT.SYSTEM_DESC[s]) + '</p></div>';
-      }).join('') + '</div></section>';
+      }).join('') + '</div></section>' +
+      '<section class="hint-box stack-s" id="dangerZone"><b class="small">ลบรายวิชา</b><p class="small muted">ใช้เมื่อสร้างผิดหรือไม่ใช้แล้ว · ควร “สำรองข้อมูลวิชา” ก่อน เพราะลบแล้วกู้คืนไม่ได้</p>' +
+      '<div class="row"><button class="btn sm danger" type="button" id="delBtn">ลบรายวิชานี้…</button></div></section>';
+    $('#delBtn').addEventListener('click', openDelete);
     $('#editBtn').addEventListener('click', function () {
       $('#cc').value = c.code; $('#cn').value = c.name; $('#cs').value = c.section; $('#mErr').textContent = '';
       HBT.modal.open('mEdit');
     });
   }
+
+  /* ---------- ลบรายวิชา (ถาวร · ทีละช่วง · ทำต่อได้) ---------- */
+  var delBusy = false, expect = '';
+  function norm(s) { return String(s || '').replace(/\s+/g, '').toUpperCase(); }
+  function openDelete() {
+    var c = course; expect = c.code + '-' + c.section;
+    var stale = c.backupAt && String(c.lastChangeAt || '') > String(c.backupAt);
+    $('#delInfo').innerHTML = '<p>จะลบ <b>' + esc(expect) + '</b> — ' + esc(c.name) + ' (นักศึกษา ' + c.students + ' คน)</p>' +
+      (!c.backupAt ? '<div class="callout warn small" id="delNoBackup"><b>ยังไม่เคยสำรองข้อมูลวิชานี้</b> — <a href="' + root + 't/backup.html?id=' + encodeURIComponent(c.courseId) + '">ไปสำรองก่อน</a></div>'
+        : stale ? '<div class="callout warn small" id="delStale"><b>มีการแก้ไขหลังสำรองครั้งล่าสุด</b> — <a href="' + root + 't/backup.html?id=' + encodeURIComponent(c.courseId) + '">สำรองใหม่</a></div>' : '');
+    $('#delLbl').innerHTML = 'พิมพ์รหัสวิชา-กลุ่ม <b>' + esc(expect) + '</b> เพื่อยืนยัน';
+    $('#delConfirm').value = ''; $('#delGo').disabled = true; $('#delErr').textContent = ''; $('#delProg').textContent = '';
+    HBT.modal.open('mDel');
+  }
+  $('#delConfirm').addEventListener('input', function () { $('#delGo').disabled = delBusy || norm(this.value) !== norm(expect); });
+  var PH = { students: 'ลบรายชื่อนักศึกษา…', exam: 'ลบข้อสอบและรูป…', drive: 'ลบไฟล์งานใน Drive…', rows: 'ลบข้อมูลในตาราง…', done: 'เสร็จ' };
+  function delStep(loops) {
+    return HBT.api.call('course.delete', { courseId: id, confirm: $('#delConfirm').value.trim() }).then(function (r) {
+      $('#delProg').textContent = PH[r.phase] || r.phase || '';
+      if (r.done) return r;
+      if (loops > 60) throw new Error('ใช้เวลานานผิดปกติ — กดลบอีกครั้งเพื่อทำต่อ');
+      return delStep(loops + 1);
+    });
+  }
+  $('#delGo').addEventListener('click', function () {
+    var b = this; delBusy = true; b.disabled = true; $('#delConfirm').disabled = true; $('#delErr').textContent = '';
+    HBT.busy(b, function () {
+      return delStep(0).then(function () {
+        HBT.toast('ลบรายวิชาแล้ว', 'good');
+        location.replace(root + 't/courses.html'); return new Promise(function () {});
+      });
+    }).catch(function (e) {
+      delBusy = false; $('#delConfirm').disabled = false; $('#delGo').disabled = norm($('#delConfirm').value) !== norm(expect);
+      $('#delErr').textContent = HBT.errMsg(e) + (e.code === 'E_EXAM_DOWN' ? ' — ยังไม่ได้ลบอะไร' : e.code === 'E_RESET_CONFIRM' ? '' : ' — ข้อมูลที่ลบไปแล้วไม่กลับมา กดลบอีกครั้งเพื่อทำต่อ');
+    });
+  });
 
   function load() {
     return HBT.api.call('course.get', { courseId: id }).then(function (c) { course = c; render(); }, function (e) {

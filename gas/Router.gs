@@ -96,6 +96,11 @@ var ROUTES = {
     auth: 'user', write: true,
     fn: function (a, u) { return Courses.update(u, a); }
   },
+  // ลบวิชาถาวร (เจ้าของ/admin) — ล็อกเองเป็นช่วงๆ ข้างใน Reset (Drive/Exam ช้า ห้ามถือ lock ตลอด) · เรียกซ้ำจนกว่า done
+  'course.delete': {
+    auth: 'user',
+    fn: function (a, u) { return Reset.courseOwn(u, a); }
+  },
 
   /* ---------- นักศึกษา / PIN ---------- */
   'student.list': {

@@ -186,6 +186,15 @@ var Reset = (function () {
     return res;
   }
 
+  /** เจ้าของวิชา (หรือ admin) ลบวิชาของตัวเอง — ใช้ลำดับลบเดิมทุกอย่าง (ข้อความยืนยัน · ทีละช่วง · ทำต่อได้)
+   *  ไม่ผ่าน Courses.require เพราะต้องเรียกซ้ำได้หลังตั้งธง reset_at แล้ว (ลบค้างกลางทาง) */
+  function courseOwn(user, a) {
+    var c = Db.byId('Courses', U.req(a.courseId, 'courseId'));
+    if (!c) throw U.E('E_NOT_FOUND');
+    if (user.role !== 'admin' && c.owner_email !== user.email) throw U.E('E_FORBIDDEN');
+    return course(user, a);
+  }
+
   /* ---------- ลบภาคเรียน (ว่างเปล่าเท่านั้น) ---------- */
   function term(user, a) {
     var t = Db.byId('Terms', U.req(a.termId, 'termId'));
@@ -215,5 +224,5 @@ var Reset = (function () {
     return out;
   }
 
-  return { manifest: manifest, mark: mark, preview: preview, course: course, term: term, pins: pins, COURSE_TABLES: COURSE_TABLES, purgeDrive: purgeDrive_ };
+  return { manifest: manifest, mark: mark, preview: preview, course: course, courseOwn: courseOwn, term: term, pins: pins, COURSE_TABLES: COURSE_TABLES, purgeDrive: purgeDrive_ };
 })();

@@ -219,6 +219,42 @@ test('reset.course: ข้อความยืนยันไม่ตรง/�
   assert.strictEqual(code(P.core.api(P.A, 'reset.course', { courseId: P.cid2, confirm: ' chm201 - 1 ' })), 'OK');
 });
 
+group('course.delete: เจ้าของวิชาลบวิชาของตัวเอง');
+test('course.delete: คนอื่น/อาจารย์ไม่มีวิชา/นักศึกษา/ไม่มี token ลบไม่ได้ · ข้อความยืนยันผิด → E_RESET_CONFIRM · ไม่ลบอะไร', () => {
+  const P = full(); const snap = JSON.stringify(P.core.state.sheets), ex = JSON.stringify(P.exState.sheets);
+  const del = (tok, over) => code(P.core.api(tok, 'course.delete', Object.assign({ courseId: P.cid, confirm: 'BIO101-1' }, over || {})));
+  assert.strictEqual(del(P.T2), 'E_FORBIDDEN'); assert.strictEqual(del(P.T3), 'E_FORBIDDEN');
+  assert.strictEqual(del(''), 'E_AUTH'); assert.strictEqual(del(coreTok(P, 1)), 'E_AUTH');
+  assert.strictEqual(del(P.T1, { confirm: 'BIO101-2' }), 'E_RESET_CONFIRM'); assert.strictEqual(del(P.T1, { confirm: '' }), 'E_RESET_CONFIRM');
+  assert.strictEqual(del(P.T1, { courseId: 'CRS-NONE' }), 'E_NOT_FOUND');
+  assert.strictEqual(JSON.stringify(P.core.state.sheets), snap); assert.strictEqual(JSON.stringify(P.exState.sheets), ex);
+});
+test('course.delete: เจ้าของลบวิชาตัวเองได้ครบทุกระบบ (เรียกซ้ำจนเสร็จ) · วิชาของคนอื่นไม่ถูกแตะ · admin ลบวิชาของอาจารย์ได้', () => {
+  const P = full(); const other = snapshot(P, P.cid2);
+  let r; for (let i = 0; i < 30; i++) { r = ok(P.core.api(P.T1, 'course.delete', { courseId: P.cid, confirm: ' bio101-1 ' })); if (r.done) break; }
+  assert.strictEqual(r.done, true);
+  Object.values(snapshot(P, P.cid)).forEach(v => assert.strictEqual(v, 0));
+  assert.strictEqual(rowsOf(P, 'Courses').some(x => x[0] === P.cid), false);
+  assert.deepStrictEqual(snapshot(P, P.cid2), other);
+  assert.strictEqual(ok(P.core.api(P.T1, 'course.list', {})).courses.length, 0);
+  assert.strictEqual(code(P.core.api(P.T1, 'course.get', { courseId: P.cid })), 'E_NOT_FOUND');
+  assert.strictEqual(P.core.rows('AuditLog').filter(x => x[3] === 'reset.course').length, 1);
+  // admin ลบวิชาของอาจารย์ 2 ผ่าน course.delete ได้เช่นกัน
+  assert.strictEqual(ok(P.core.api(P.A, 'course.delete', { courseId: P.cid2, confirm: 'CHM201-1' })).done, true);
+  assert.strictEqual(snapshot(P, P.cid2).Students, 0);
+});
+test('course.delete: ลบค้างกลางทาง (Exam ล่ม หลังตั้งธงแล้ว) → เจ้าของเรียกซ้ำเพื่อทำต่อได้ ทั้งที่วิชาอยู่สถานะ resetting', () => {
+  const P = full(); const real = P.core.state.fetchHandler;
+  P.core.state.fetchHandler = (url, o) => { const a = o && o.payload ? JSON.parse(o.payload).action : ''; if (a === 'svc.purgeImages') { P.mode.exam = 'down'; } return real(url, o); };
+  const r1 = P.core.api(P.T1, 'course.delete', { courseId: P.cid, confirm: 'BIO101-1' });
+  assert.strictEqual(r1.ok, false);
+  P.core.state.fetchHandler = real; P.mode.exam = 'up';
+  assert.strictEqual(code(P.core.api(P.T1, 'course.get', { courseId: P.cid })), 'E_COURSE_RESETTING');
+  assert.strictEqual(code(P.core.api(P.T2, 'course.delete', { courseId: P.cid, confirm: 'BIO101-1' })), 'E_FORBIDDEN');
+  let r; for (let i = 0; i < 30; i++) { r = ok(P.core.api(P.T1, 'course.delete', { courseId: P.cid, confirm: 'BIO101-1' })); if (r.done) break; }
+  assert.strictEqual(r.done, true); Object.values(snapshot(P, P.cid)).forEach(v => assert.strictEqual(v, 0));
+});
+
 group('รีเซ็ตวิชา: ลบครบทุกระบบ ไม่แตะวิชาอื่น');
 test('ลบวิชา: ทุกตารางของ Core + Exam + ไฟล์ Drive (Core) + รูปข้อสอบ (Exam) หายถาวร · วิชาอื่นครบเหมือนเดิม', () => {
   const P = full();
