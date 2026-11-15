@@ -34,6 +34,16 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     return '<span class="pill ' + (stale ? 'warn' : 'good') + '" id="bkPill">' + (stale ? 'มีแก้ไขหลังสำรอง' : 'สำรองแล้ว') + ' · ' + esc(HBT.fmtBE(c.backupAt, true)) + '</span>';
   }
 
+  /** ระบบประจำวิชา: แสดงเฉพาะระบบที่ได้รับสิทธิ์ (ไม่มีสิทธิ์ = ไม่แสดงเลย · ไม่มีสักระบบ = ไม่แสดงหัวข้อ) */
+  function sysSection(q) {
+    var mine = ['att', 'exam', 'asg'].filter(function (s) { return ctx.user.role === 'admin' || ctx.user.systems.indexOf(s) >= 0; });
+    if (!mine.length) return '';
+    return '<section class="stack" id="sysSection"><h3>ระบบประจำวิชา</h3><div class="grid g3">' + mine.map(function (s) {
+      var gid = { att: 'goAtt', exam: 'goExam', asg: 'goAsg' }[s], page = { att: 't/att.html', exam: 't/exam.html', asg: 't/asg.html' }[s];
+      return '<a class="card link-card" id="' + gid + '" href="' + root + page + '?id=' + q + '"><div class="row sp"><b>' + esc(HBT.SYSTEM_NAMES[s]) + '</b><span class="pill good">เปิดใช้</span></div><p class="small muted">' + esc(HBT.SYSTEM_DESC[s]) + '</p><span class="arrow">เปิด ›</span></a>';
+    }).join('') + '</div></section>';
+  }
+
   function render() {
     var c = course, q = encodeURIComponent(c.courseId);
     document.title = c.code + ' — HBT Learning System';
@@ -50,15 +60,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
       '<a class="card link-card" id="goScores" href="' + root + 't/scores.html?id=' + q + '"><h3>คะแนน</h3><p class="small muted">กำหนดประเภทคะแนนและน้ำหนัก · กรอก/วางจาก Excel · ส่งออก CSV</p><span class="arrow">เปิด ›</span></a>' +
       '<a class="card link-card" id="goBackup" href="' + root + 't/backup.html?id=' + q + '"><div class="row sp"><h3>สำรองข้อมูลวิชา</h3>' + backupPill(c) + '</div><p class="small muted">ดาวน์โหลดรายชื่อ คะแนน เช็คชื่อ ข้อสอบ และไฟล์งานของนักศึกษาเก็บไว้ก่อนสิ้นภาคเรียน</p><span class="arrow">เปิด ›</span></a>' +
       '</div>' +
-      '<section class="stack"><h3>ระบบประจำวิชา</h3><div class="grid g3">' +
-      ['att', 'exam', 'asg'].map(function (s) {
-        var has = ctx.user.role === 'admin' || ctx.user.systems.indexOf(s) >= 0;
-        if (has) {
-          var gid = { att: 'goAtt', exam: 'goExam', asg: 'goAsg' }[s], page = { att: 't/att.html', exam: 't/exam.html', asg: 't/asg.html' }[s];
-          return '<a class="card link-card" id="' + gid + '" href="' + root + page + '?id=' + q + '"><div class="row sp"><b>' + esc(HBT.SYSTEM_NAMES[s]) + '</b><span class="pill good">เปิดใช้</span></div><p class="small muted">' + esc(HBT.SYSTEM_DESC[s]) + '</p><span class="arrow">เปิด ›</span></a>';
-        }
-        return '<div class="card sys-off"><div class="row sp"><b>' + esc(HBT.SYSTEM_NAMES[s]) + '</b><span class="pill">ไม่มีสิทธิ์</span></div><p class="small muted">' + esc(HBT.SYSTEM_DESC[s]) + '</p></div>';
-      }).join('') + '</div></section>' +
+      sysSection(q) +
       '<section class="hint-box stack-s" id="dangerZone"><b class="small">ลบรายวิชา</b><p class="small muted">ใช้เมื่อสร้างผิดหรือไม่ใช้แล้ว · ควร “สำรองข้อมูลวิชา” ก่อน เพราะลบแล้วกู้คืนไม่ได้</p>' +
       '<div class="row"><button class="btn sm danger" type="button" id="delBtn">ลบรายวิชานี้…</button></div></section>';
     $('#delBtn').addEventListener('click', openDelete);

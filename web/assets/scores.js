@@ -58,6 +58,13 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     if (txt === '') return true;
     return NUM.test(txt) && Number(txt) <= max + 1e-9;
   }
+  /** ประเภทที่แสดง: กลางภาค/ปลายภาคเสมอ · เข้าเรียน/คะแนนเก็บ/ทดสอบ เฉพาะเมื่อมีสิทธิ์ระบบนั้น (หรือมีรายการอยู่แล้ว) */
+  function shownCats() {
+    var u = ctx.user;
+    return CATS.filter(function (c) {
+      return !{ att: 1, asg: 1, exam: 1 }[c.k] || u.role === 'admin' || u.systems.indexOf(c.k) >= 0 || tb.types.some(function (t) { return t.cat === c.k; });
+    });
+  }
   function typesIn(k) { return tb.types.filter(function (t) { return k === 'all' || t.cat === k; }); }
   function catPct(k) { var n = 0; tb.types.forEach(function (t) { if (t.cat === k) n += t.pct; }); return r2(n); }
   function rowTotal(s) {
@@ -74,7 +81,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
   /* ---------- แถบสัดส่วนแบ่งสี ---------- */
   function renderBar() {
     var tot = tb.totalPct, remain = r2(100 - tot);
-    var all = CATS.concat([OTHER]);
+    var all = shownCats().concat([OTHER]);
     var segs = all.map(function (c) {
       var p = catPct(c.k);
       return p > 0 ? '<i class="cat-' + c.k + '" style="width:' + p + '%;background:var(--c)" title="' + esc(c.name + ' ' + p + '%') + '"></i>' : '';
@@ -150,7 +157,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
   function renderSel() {
     return '<div class="field" style="max-width:340px"><label for="catSel">ประเภทคะแนน</label><select id="catSel">' +
       '<option value="all"' + (cat === 'all' ? ' selected' : '') + '>ทั้งหมด (ภาพรวม)</option>' +
-      CATS.map(function (c) { return '<option value="' + c.k + '"' + (cat === c.k ? ' selected' : '') + '>' + esc(c.name) + ' (' + esc(c.src) + ')</option>'; }).join('') + '</select></div>';
+      shownCats().map(function (c) { return '<option value="' + c.k + '"' + (cat === c.k ? ' selected' : '') + '>' + esc(c.name) + ' (' + esc(c.src) + ')</option>'; }).join('') + '</select></div>';
   }
 
   function render() {

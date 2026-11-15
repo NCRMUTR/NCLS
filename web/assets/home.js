@@ -17,16 +17,16 @@ HBT.page({ active: 'home' }, function (ctx) {
 
   h += '<a class="card link-card" id="goCourses" href="' + root + 't/courses.html"><div class="row sp"><h3>รายวิชาของฉัน</h3><span class="pill acc">ข้อมูลกลาง</span></div>' +
     '<p class="small muted">สร้างรายวิชา นำเข้ารายชื่อนักศึกษา รีเซ็ต PIN ให้นักศึกษา จัดการคะแนน</p><span class="arrow">เปิด ›</span></a>';
-  h += '<div class="grid g3" id="sysCards">';
-  ['att', 'exam', 'asg'].forEach(function (s) {
-    var ok = mine.indexOf(s) >= 0;
-    var live = ok;
-    h += '<' + (live ? 'a href="' + root + 't/courses.html"' : 'div') + ' class="card link-card' + (ok ? '' : ' sys-off') + '" data-sys="' + s + '"><div class="row sp"><h3>' + esc(HBT.SYSTEM_NAMES[s]) + '</h3>' +
-      (ok ? '<span class="pill good">มีสิทธิ์</span>' : '<span class="pill">ไม่มีสิทธิ์</span>') + '</div>' +
-      '<p class="small muted">' + esc(HBT.SYSTEM_DESC[s]) + '</p>' +
-      (live ? '<span class="arrow">' + ({ att: 'เลือกรายวิชาเพื่อเช็คชื่อ', exam: 'เลือกรายวิชาเพื่อจัดสอบ', asg: 'เลือกรายวิชาเพื่อสั่งงาน' }[s]) + ' ›</span>' : '') + '</' + (live ? 'a' : 'div') + '>';
-  });
-  h += '</div>';
+  if (mine.length) {                       // แสดงเฉพาะระบบที่ได้รับสิทธิ์ (ไม่แสดงระบบที่ไม่มีสิทธิ์เลย)
+    h += '<div class="grid g3" id="sysCards">';
+    mine.forEach(function (s) {
+      h += '<a href="' + root + 't/courses.html" class="card link-card" data-sys="' + s + '"><div class="row sp"><h3>' + esc(HBT.SYSTEM_NAMES[s]) + '</h3>' +
+        '<span class="pill good">มีสิทธิ์</span></div>' +
+        '<p class="small muted">' + esc(HBT.SYSTEM_DESC[s]) + '</p>' +
+        '<span class="arrow">' + ({ att: 'เลือกรายวิชาเพื่อเช็คชื่อ', exam: 'เลือกรายวิชาเพื่อจัดสอบ', asg: 'เลือกรายวิชาเพื่อสั่งงาน' }[s]) + ' ›</span></a>';
+    });
+    h += '</div>';
+  }
 
   if (u.role === 'admin') {
     h += '<section class="card stack" id="admCard"><div class="card-head"><h2>ผู้ดูแลระบบ</h2><span class="pill adm">admin</span></div>' +

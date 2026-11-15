@@ -181,7 +181,7 @@ def _():
     side = p.inner_text('#side')
     assert 'ผู้ใช้และสิทธิ์' not in side and 'เช็คชื่อ' in side and 'สอบออนไลน์' not in side, side
     cards = {el.get_attribute('data-sys'): el.inner_text() for el in p.locator('#sysCards [data-sys]').all()}
-    assert 'มีสิทธิ์' in cards['att'] and 'ไม่มีสิทธิ์' in cards['exam'] and 'ไม่มีสิทธิ์' in cards['asg'], cards
+    assert list(cards.keys()) == ['att'] and 'มีสิทธิ์' in cards['att'], cards      # แสดงเฉพาะระบบที่มีสิทธิ์
     assert 'ทดสอบ หนึ่ง' in p.inner_text('h1')
     for path in ['/a/users.html', '/a/settings.html']:
         p.goto(BASE + path)

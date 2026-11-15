@@ -564,8 +564,8 @@ def _():
     a = mk_asg(cid)
     c = teacher()
     c.login_as(T2, 'อ.สอง', to='/t/home.html')
-    c.page.wait_for_selector('#sysCards')
-    assert c.page.locator('#sysCards [data-sys=asg].sys-off').count() == 1
+    c.page.wait_for_selector('#goCourses')
+    assert c.page.locator('[data-sys=asg]').count() == 0      # ไม่มีสิทธิ์ = ไม่แสดงการ์ดระบบนั้น
     c.page.goto(BASE + '/t/asg.html?id=' + cid)
     c.page.wait_for_selector('.callout.bad')
     assert 'ไม่มีสิทธิ์' in c.page.inner_text('.callout.bad')
