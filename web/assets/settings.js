@@ -72,8 +72,12 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
         '<input id="' + id + '" data-key="' + esc(d.key) + '" type="number" inputmode="numeric" min="' + d.min + '" max="' + d.max + '" step="1" value="' + esc(d.value) + '">' +
         '<span class="help">ช่วงที่ใช้ได้ ' + d.min + '–' + d.max + ' · ค่าเริ่มต้น ' + esc(d.def) + '</span></div>';
     }
+    if (d.type === 'bool') {
+      return '<div class="field"><label class="row" for="' + id + '" style="cursor:pointer"><input id="' + id + '" data-key="' + esc(d.key) + '" type="checkbox"' +
+        (String(d.value) === '1' ? ' checked' : '') + ' style="accent-color:var(--accent)"> <span>' + esc(d.label) + '</span></label></div>';
+    }
     if (d.type === 'list') {
-      var on = String(d.value).split(',');
+      var on =String(d.value).split(',');
       return '<div class="field"><span class="lbl">' + esc(d.label) + '</span><div class="row" data-key="' + esc(d.key) + '" data-list="1">' +
         d.options.map(function (o) {
           return '<label class="pill acc" style="cursor:pointer"><input type="checkbox" value="' + esc(o) + '"' + (on.indexOf(o) >= 0 ? ' checked' : '') +
@@ -97,7 +101,9 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
   }
   function current() {
     var cur = {};
-    HBT.$$('#setBody input[data-key]').forEach(function (i) { cur[i.getAttribute('data-key')] = i.value.trim(); });
+    HBT.$$('#setBody input[data-key]').forEach(function (i) {
+      cur[i.getAttribute('data-key')] = i.type === 'checkbox' ? (i.checked ? '1' : '0') : i.value.trim();
+    });
     HBT.$$('#setBody [data-list]').forEach(function (w) {
       cur[w.getAttribute('data-key')] = HBT.$$('input:checked', w).map(function (c) { return c.value; }).join(',');
     });

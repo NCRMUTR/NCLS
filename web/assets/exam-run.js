@@ -116,7 +116,7 @@
   function violHtml() { return '<div class="ex-warn" id="violBar">ระบบบันทึกว่าคุณออกจากหน้าจอ ' + st.violations + ' ครั้ง</div>'; }
 
   /* ---------- โครงหน้า ---------- */
-  function head() { return '<div class="stack-s"><a class="brand" href="' + root + 'index.html"><span class="mark">H</span>HBT Teaching</a></div>'; }
+  function head() { return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Teaching</a></div>'; }
   function hero() {
     var c = st.res.course, s = st.res.session;
     return '<div class="ex-hero" id="hero"><div class="code">' + esc(c.code) + ' · กลุ่ม ' + esc(c.section) + '</div><h2>' + esc(s.title || c.name) + '</h2>' +
@@ -124,7 +124,7 @@
       '<span class="tag">' + (s.mode === 'PRACTISE' ? 'ฝึกทำ' : 'สอบ') + '</span></div>';
   }
   function fail(title, msg) {
-    app.innerHTML = head() + '<div class="callout bad"><b>' + esc(title) + '</b><br>' + esc(msg) + '</div><div><a class="btn" href="' + root + 'index.html">กลับหน้าแรก</a></div>';
+    app.innerHTML = head() + '<div class="callout bad"><b>' + esc(title) + '</b><br>' + esc(msg) + '</div><div><a class="btn" href="' + root + 's/home.html">กลับหน้าแรก</a></div>';
   }
 
   /* ============================================================
@@ -159,7 +159,7 @@
     app.innerHTML = head() + hero() +
       '<section class="card stack" id="cover"><div id="cvStat" class="small muted"></div><h3>ยืนยันตัวตน</h3>' +
       '<p class="small muted">เลือกชื่อของคุณแล้วใส่ PIN 4 หลัก</p>' + (msg ? '<div class="callout warn">' + esc(msg) + '</div>' : '') + '<div id="loginBox"></div></section>' +
-      '<p class="small muted"><a href="' + root + 'index.html">กลับหน้าแรก</a></p>';
+      '<p class="small muted"><a href="' + root + 's/home.html">กลับหน้าแรก</a></p>';
     $('#cvStat').textContent = statLine();
     if (sess && sess.courseId === st.res.course.courseId) { afterLogin(); return; }
     S.loginBox($('#loginBox'), { courseId: st.res.course.courseId, tid: '', onDone: function () { afterLogin(); } });
@@ -226,7 +226,7 @@
       (can ? '<button class="btn primary block" type="button" id="goBtn" style="min-height:52px;font-size:1.05rem">' + label + '</button>'
            : '<div class="callout warn" id="cant">' + esc(why) + '</div>') +
       '<div class="err" id="goErr" role="alert"></div></section>' + past +
-      '<p class="small muted"><a href="#" id="bye">ไม่ใช่คุณ? ออกจากระบบ</a> · <a href="' + root + 'index.html">กลับหน้าแรก</a></p>';
+      '<p class="small muted"><a href="#" id="bye">ไม่ใช่คุณ? ออกจากระบบ</a> · <a href="' + root + 's/home.html">กลับหน้าแรก</a></p>';
     $('#bye').addEventListener('click', function (e) { e.preventDefault(); S.clear(); cover(); });
     var g = $('#goBtn');
     if (g) g.addEventListener('click', function () { startNow(g); });
@@ -485,7 +485,7 @@
       '<div><b class="mono" style="font-size:1.3rem;color:var(--muted)">' + res.unanswered + '</b><div class="xs muted">ไม่ได้ตอบ</div></div></div>' +
       '<div class="ex-omr" style="justify-content:center">' + res.items.map(function (it) { return '<div class="b ' + (it.correct ? 'ok' : 'no') + '">' + it.qNo + '</div>'; }).join('') + '</div>' + cs +
       '<p class="small muted">' + (res.mode === 'PRACTISE' ? 'บันทึกผลการฝึกทำแล้ว ทบทวนข้อที่ผิดได้จากกระดาษคำตอบด้านบน' : 'บันทึกผลเรียบร้อยแล้ว ปิดหน้านี้ได้เลย') + '</p></section>' +
-      '<div class="row"><button class="btn" type="button" id="again">กลับหน้าเริ่มต้น</button><a class="btn ghost" href="' + root + 'index.html">หน้าแรก</a></div>';
+      '<div class="row"><button class="btn" type="button" id="again">กลับหน้าเริ่มต้น</button><a class="btn ghost" href="' + root + 's/home.html">หน้าแรก</a></div>';
     $('#again').addEventListener('click', function () { location.reload(); });
     window.scrollTo(0, 0);
   }

@@ -11,6 +11,7 @@ var SETTING_DEFS = [
   { key: 'att_radius_m', label: 'รัศมีเช็คชื่อเริ่มต้น (เมตร)', group: 'เช็คชื่อ', type: 'int', min: 10, max: 5000, def: '500' },
   { key: 'att_normal_min', label: 'นับเป็นปกติ (นาทีหลังเริ่ม)', group: 'เช็คชื่อ', type: 'int', min: 1, max: 180, def: '10' },
   { key: 'att_close_min', label: 'ปิดรับ (นาทีหลังเริ่ม)', group: 'เช็คชื่อ', type: 'int', min: 1, max: 300, def: '20' },
+  { key: 'att_require_pin', label: 'เช็คชื่อต้องใช้ PIN เมื่อใช้เครื่องใหม่ (ปิด = ไม่ถามและไม่ให้ตั้ง PIN ตอนเช็คชื่อ)', group: 'เช็คชื่อ', type: 'bool', def: '1' },
   { key: 'pin_max_fail', label: 'ใส่ PIN ผิดได้กี่ครั้งก่อนล็อก', group: 'PIN นักศึกษา', type: 'int', min: 3, max: 10, def: '5' },
   { key: 'pin_lock_min', label: 'ล็อกกี่นาที', group: 'PIN นักศึกษา', type: 'int', min: 1, max: 120, def: '15' }
 ];
@@ -62,6 +63,12 @@ var Settings = (function () {
       });
       if (!out.length) throw U.E('E_SETTING', { key: d.key });
       return out.join(',');
+    }
+    if (d.type === 'bool') {
+      var s = String(value).trim().toLowerCase();
+      if (s === '1' || s === 'true' || s === 'on') return '1';
+      if (s === '0' || s === 'false' || s === 'off') return '0';
+      throw U.E('E_SETTING', { key: d.key });
     }
     return String(value);
   }

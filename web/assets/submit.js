@@ -16,12 +16,12 @@
   }
 
   function head(sub) {
-    return '<div class="stack-s"><a class="brand" href="' + root + 'index.html"><span class="mark">H</span>HBT Teaching</a><h1>ส่งงาน</h1>' + (sub || '') + '</div>';
+    return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Teaching</a><h1>ส่งงาน</h1>' + (sub || '') + '</div>';
   }
   function foot() {
     var s = S.sess();
     return '<p class="small muted">' + (s ? '<a href="' + root + 's/tasks.html">งานทั้งหมดของฉัน</a> · <a href="#" id="bye">ออกจากระบบ</a> · ' : '') +
-      '<a href="' + root + 'index.html">กลับหน้าแรก</a></p>';
+      '<a href="' + root + 's/home.html">กลับหน้าแรก</a></p>';
   }
   function bindFoot() {
     var b = $('#bye');

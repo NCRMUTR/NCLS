@@ -451,7 +451,8 @@ test('settings.get ครบค่า default', () => {
   assert.strictEqual(m.file_max_mb, '5');
   assert.strictEqual(m.att_radius_m, '500');
   assert.strictEqual(m.file_types, 'pdf,jpg,png,docx,xlsx,pptx');
-  assert.strictEqual(r.length, 8);
+  assert.strictEqual(m.att_require_pin, '1');
+  assert.strictEqual(r.length, 9);
 });
 test('settings.set: บันทึกหลายค่า + มีผลทันทีข้าม execution + audit', () => {
   const s = fresh();

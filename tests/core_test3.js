@@ -234,6 +234,22 @@ test('อาจารย์ออกรหัสชั่วคราว (reset)
   assert.strictEqual(code(ci(s, o3.sessionId, 1, 7)), 'E_ATT_PIN_REQUIRED');
   assert.strictEqual(ok(ci(s, o3.sessionId, 1, 7, { pin: '5555' })).status, 'normal');
 });
+test('att_require_pin = 0: เช็คชื่อไม่ถาม/ไม่ตั้ง PIN แม้เครื่องใหม่ · ยังกันเครื่องชน · เปิดกลับ = ถาม PIN เหมือนเดิม', () => {
+  const s = world(); const o = open(s);
+  assert.strictEqual(ok(s.api(s.A, 'settings.get', {})).settings.filter(x => x.key === 'att_require_pin')[0].value, '1', 'ค่าเริ่มต้น = ใช้ PIN');
+  assert.strictEqual(code(s.api(s.A, 'settings.set', { changes: { att_require_pin: 'maybe' } })), 'E_SETTING');
+  ok(s.api(s.A, 'settings.set', { changes: { att_require_pin: '0' } }));
+  const r = ok(ci(s, o.sessionId, 1, 1));
+  assert.strictEqual(r.status, 'normal'); assert.strictEqual(r.pinJustSet, false);
+  assert.strictEqual(s.rows('StudentPIN').length, 0, 'ไม่สร้าง PIN ตอนเช็คชื่อ');
+  assert.strictEqual(code(ci(s, o.sessionId, 2, 1)), 'E_ATT_DEVICE_CONFLICT', 'เครื่องเดียวกันเช็คให้อีกคนยังไม่ได้');
+  assert.strictEqual(ok(ci(s, o.sessionId, 3, 2)).already, false);
+  ok(s.api(s.T1, 'att.close', { sessionId: o.sessionId }));
+  ok(s.api(s.A, 'settings.set', { changes: { att_require_pin: '1' } }));
+  const o2 = open(s);
+  const r2 = ci(s, o2.sessionId, 4, 3);
+  assert.strictEqual(code(r2), 'E_ATT_PIN_REQUIRED'); assert.strictEqual(r2.error.detail.mode, 'set');
+});
 test('จำเครื่องได้สูงสุด 3 เครื่อง (เก่าสุดถูกลืม)', () => {
   const s = world();
   for (let k = 1; k <= 4; k++) {

@@ -312,10 +312,14 @@ var Attendance = (function () {
     }
 
     // PIN: เครื่องใหม่ของนักศึกษาคนนี้ต้องยืนยัน PIN (ตั้ง PIN ครั้งแรกได้ที่นี่)
-    var trusted = trustedDevices_(std).some(function (t) { return t.device_id === dev; });
-    var pst = Pin.status(std), mode = '';
-    if (pst === 'set') { if (!trusted) mode = 'enter'; }
-    else mode = (pst === 'temp') ? 'temp' : 'set';
+    // (ตั้งค่า att_require_pin = 0 → ข้ามทั้งหมด: ไม่ถาม PIN และไม่ให้ตั้ง PIN ตอนเช็คชื่อ)
+    var mode = '';
+    if (Settings.get('att_require_pin') !== '0') {
+      var trusted = trustedDevices_(std).some(function (t) { return t.device_id === dev; });
+      var pst = Pin.status(std);
+      if (pst === 'set') { if (!trusted) mode = 'enter'; }
+      else mode = (pst === 'temp') ? 'temp' : 'set';
+    }
     if (mode === 'enter') {
       if (a.pin === undefined || a.pin === null || a.pin === '') throw U.E('E_ATT_PIN_REQUIRED', { mode: 'enter' });
       U.lock(function () { Db.flush(); Pin.verify(std, a.pin); }, 30000);   // นับครั้งที่ผิดใน lock (ยิงขนานก็นับครบ) · ผิด/ล็อก → โยน E_PIN_BAD / E_PIN_LOCKED

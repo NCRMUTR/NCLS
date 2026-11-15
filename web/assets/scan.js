@@ -35,7 +35,7 @@
   }
 
   function head() {
-    return '<div class="stack-s"><a class="brand" href="' + root + 'index.html"><span class="mark">H</span>HBT Teaching</a><h1>เช็คชื่อเข้าเรียน</h1></div>';
+    return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Teaching</a><h1>เช็คชื่อเข้าเรียน</h1></div>';
   }
   function opt(v, t) { return '<option value="' + esc(v) + '">' + esc(t) + '</option>'; }
   function mmss(sec) { sec = Math.max(0, Math.round(sec)); return (sec < 600 ? '0' : '') + Math.floor(sec / 60) + ':' + (sec % 60 < 10 ? '0' : '') + (sec % 60); }
@@ -56,7 +56,7 @@
       (i.hasLocation ? '<p class="small muted">คาบนี้ตรวจตำแหน่ง — เบราว์เซอร์จะขอสิทธิ์ใช้ตำแหน่ง ให้กด “อนุญาต”</p>' : '') +
       '</section>' +
       '<div id="done" class="callout good stack-s" hidden role="status"></div>' +
-      '<p class="small muted">ยังไม่เคยตั้ง PIN หรือลืม PIN? <a href="' + root + 's/pin.html">ตั้ง / เปลี่ยน PIN</a> · <a href="' + root + 'index.html">กลับหน้าแรก</a></p>';
+      '<p class="small muted">ยังไม่เคยตั้ง PIN หรือลืม PIN? <a href="' + root + 's/pin.html">ตั้ง / เปลี่ยน PIN</a> · <a href="' + root + 's/home.html">กลับหน้าแรก</a></p>';
     banner();
     $('#fq').addEventListener('input', fill);
     $('#selS').addEventListener('change', onStd);

@@ -11,7 +11,7 @@
   }
 
   app.innerHTML =
-    '<div class="stack-s"><a class="brand" href="' + root + 'index.html"><span class="mark">H</span>HBT Teaching</a>' +
+    '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Teaching</a>' +
     '<h1>ตั้ง / เปลี่ยน PIN</h1><p class="muted">PIN 4 หลักของคุณใช้ยืนยันตัวตนตอนเช็คชื่อ ส่งงาน และทำข้อสอบ — ใช้ร่วมกันทุกวิชา</p></div>' +
     '<section class="card stack" id="pick"><h2>คุณคือใคร</h2>' +
     '<div class="field"><label for="selT">อาจารย์ผู้สอน</label><select id="selT"><option value="">กำลังโหลด…</option></select></div>' +
@@ -36,7 +36,7 @@
     '<div id="p-forgot" class="stack" hidden><p class="small muted">ระบบเก็บ PIN แบบเข้ารหัส อาจารย์มองไม่เห็น PIN ของคุณ — ถ้าลืม ให้ส่งคำขอ แล้วรับ “รหัสชั่วคราว” ใหม่จากอาจารย์ไปตั้ง PIN ที่แท็บแรก</p>' +
     '<button class="btn primary block" type="button" id="goForgot">ส่งคำขอให้อาจารย์ออกรหัสใหม่</button></div>' +
     '<div class="err" id="actErr" role="alert"></div><div class="callout" id="actOk" hidden role="status"></div></section>' +
-    '<p class="small muted">PIN ผิดหลายครั้งติดกัน ระบบจะล็อกชั่วคราวเพื่อป้องกันผู้อื่นเดา · <a href="' + root + 'index.html">กลับหน้าแรก</a></p>';
+    '<p class="small muted">PIN ผิดหลายครั้งติดกัน ระบบจะล็อกชั่วคราวเพื่อป้องกันผู้อื่นเดา · <a href="' + root + 's/home.html">กลับหน้าแรก</a></p>';
 
   function opt(v, t) { return '<option value="' + esc(v) + '">' + esc(t) + '</option>'; }
   function fail(el, e) { $(el).textContent = HBT.errMsg(e); }
