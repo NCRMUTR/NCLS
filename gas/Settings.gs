@@ -15,8 +15,12 @@ var SETTING_DEFS = [
   { key: 'att_score_late', label: 'คะแนนเข้าเรียนสาย (ต่อคาบ)', group: 'เช็คชื่อ', type: 'num', min: 0, max: 10, def: '0.5' },
   { key: 'att_score_absent', label: 'คะแนนขาด/ลา (ต่อคาบ)', group: 'เช็คชื่อ', type: 'num', min: 0, max: 10, def: '0' },
   { key: 'att_require_pin', label: 'เช็คชื่อต้องใช้ PIN เมื่อใช้เครื่องใหม่ (ปิด = ไม่ถามและไม่ให้ตั้ง PIN ตอนเช็คชื่อ)', group: 'เช็คชื่อ', type: 'bool', def: '1' },
+  { key: 'att_warn_absent', label: 'เตือนนักศึกษาเมื่อขาดเรียนเกินกี่ครั้ง (ไม่นับลาที่อนุมัติ)', group: 'เช็คชื่อ', type: 'int', min: 1, max: 20, def: '2' },
   { key: 'pin_max_fail', label: 'ใส่ PIN ผิดได้กี่ครั้งก่อนล็อก', group: 'PIN นักศึกษา', type: 'int', min: 3, max: 10, def: '5' },
-  { key: 'pin_lock_min', label: 'ล็อกกี่นาที', group: 'PIN นักศึกษา', type: 'int', min: 1, max: 120, def: '15' }
+  { key: 'pin_lock_min', label: 'ล็อกกี่นาที', group: 'PIN นักศึกษา', type: 'int', min: 1, max: 120, def: '15' },
+  { key: 'leave_past_days', label: 'ส่งใบลาย้อนหลังได้ไม่เกินกี่วัน', group: 'ใบลา', type: 'int', min: 0, max: 60, def: '14' },
+  { key: 'leave_future_days', label: 'ส่งใบลาล่วงหน้าได้ไม่เกินกี่วัน', group: 'ใบลา', type: 'int', min: 0, max: 180, def: '30' },
+  { key: 'leave_notice', label: 'คำชี้แจงการลา (แสดงให้นักศึกษาอ่านก่อนส่งใบลา)', group: 'ใบลา', type: 'text', max: 1500, def: '' }
 ];
 
 var Settings = (function () {
@@ -77,6 +81,11 @@ var Settings = (function () {
       if (s === '1' || s === 'true' || s === 'on') return '1';
       if (s === '0' || s === 'false' || s === 'off') return '0';
       throw U.E('E_SETTING', { key: d.key });
+    }
+    if (d.type === 'text') {
+      var t = String(value === undefined || value === null ? '' : value).replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim();
+      if (t.length > d.max) throw U.E('E_SETTING', { key: d.key, max: d.max });
+      return t;
     }
     return String(value);
   }

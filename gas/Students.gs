@@ -33,6 +33,11 @@ var STUDENT_CASCADE = [
     key: 'assignments', label: 'งานที่ส่ง/คะแนนงาน/กลุ่ม',
     count: function (courseId, stdId) { return Assignments.countForStudent(courseId, stdId); },
     remove: function (courseId, stdIds) { return Assignments.removeForStudents(courseId, stdIds); }
+  },
+  {
+    key: 'leave', label: 'ใบลา (รวมไฟล์แนบ)',
+    count: function (courseId, stdId) { return Leave.countForStudent(courseId, stdId); },
+    remove: function (courseId, stdIds) { return Leave.removeForStudents(courseId, stdIds); }
   }
 ];
 

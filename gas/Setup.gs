@@ -151,6 +151,7 @@ function setupDiag() {
     ['ExamLink', 'ExamLink.gs', typeof ExamLink],
     ['Groups', 'Groups.gs', typeof Groups],
     ['Inbox', 'Inbox.gs', typeof Inbox],
+    ['Leave', 'Leave.gs', typeof Leave],
     ['Pin', 'Pin.gs', typeof Pin],
     ['Reset', 'Reset.gs', typeof Reset],
     ['ROUTES', 'Router.gs', typeof ROUTES],

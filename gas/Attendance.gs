@@ -105,7 +105,47 @@ var Attendance = (function () {
     var ids = {}; closed.forEach(function (s) { ids[s.session_id] = true; });
     var lookup = {};
     Db.findRows('AttRecords', 'course_id', courseId).forEach(function (r) { if (ids[r.session_id]) lookup[rk_(r.session_id, r.std_id)] = r; });
+    // ใบลาที่อนุมัติ: คาบที่ "ไม่มีบันทึกเช็คชื่อ" และตรงวันลา → แสดงเป็น ล (คำนวณตอนอ่าน · บันทึกจริงชนะเสมอ · คะแนนไม่เปลี่ยน เพราะ ลา = คะแนนขาด/ลา เหมือนเดิม)
+    var lv = Leave.approvedMap(courseId);
+    if (Object.keys(lv).length && closed.length) {
+      Students.roster(courseId).forEach(function (st) {
+        var list = lv[st.std_id]; if (!list) return;
+        closed.forEach(function (s) {
+          var k = rk_(s.session_id, st.std_id);
+          if (!lookup[k] && Leave.covers(list, s.date, s.start_at)) lookup[k] = { status: 'leave', source: 'LEAVE' };
+        });
+      });
+    }
     return { sessions: closed, lookup: lookup };
+  }
+  function warnAbsent_() { var n = Number(Settings.get('att_warn_absent')); return isFinite(n) && n >= 1 ? n : 2; }
+  /** นับสถานะ/เปอร์เซ็นต์ของนักศึกษา 1 คน จากผล tally_ (สูตรเดียวกับ report) */
+  function statsOf_(t, std) {
+    var cnt = { normal: 0, late: 0, leave: 0, absent: 0, percent: null }, raw = 0, full = 0;
+    t.sessions.forEach(function (s) { var x = statusIn_(t.lookup, s.session_id, std); cnt[x]++; raw += ptsOf_(s, x); full += pts_(s).normal; });
+    cnt.percent = t.sessions.length && full ? r2_(raw / full * 100) : null;
+    return cnt;
+  }
+  /** สถิติเช็คชื่อของทุกคนในวิชา { totalSessions, byStd } (ใช้หน้าสรุปการลา/ธงขาดเกินเกณฑ์) */
+  function statsAll(courseId) {
+    sweep_(courseId);
+    var t = tally_(courseId), by = {};
+    Students.roster(courseId).forEach(function (st) { by[st.std_id] = statsOf_(t, st.std_id); });
+    return { totalSessions: t.sessions.length, byStd: by };
+  }
+  /** นักศึกษาดูการเข้าเรียนของตัวเองในวิชา (token นักศึกษา) + คำเตือนเมื่อ "ขาด" (ไม่นับลา) เกินเกณฑ์ */
+  function mineStats(s) {
+    var c = Db.byId('Courses', s.courseId);
+    if (!c) throw U.E('E_NOT_FOUND');
+    sweep_(s.courseId);
+    var t = tally_(s.courseId), x = statsOf_(t, s.stdId), warn = warnAbsent_();
+    var hist = t.sessions.slice().sort(function (a, b) { return (a.start_at || a.opened_at) < (b.start_at || b.opened_at) ? -1 : 1; })
+      .map(function (ss) { return { date: ss.date, status: statusIn_(t.lookup, ss.session_id, s.stdId) }; });
+    return {
+      course: { courseId: c.course_id, code: c.code, name: c.name, section: c.section },
+      totalSessions: t.sessions.length, normal: x.normal, late: x.late, leave: x.leave, absent: x.absent, percent: x.percent,
+      warnAbsent: warn, over: x.absent > warn, history: hist
+    };
   }
   function statusIn_(lookup, sid, std) { var r = lookup[rk_(sid, std)]; return r ? r.status : 'absent'; }
 
@@ -239,11 +279,14 @@ var Attendance = (function () {
     var latest = '';
     Object.keys(recs).forEach(function (k) { if (recs[k].at > latest) latest = recs[k].at; });
     var counts = { total: roster.length, normal: 0, late: 0, leave: 0, absent: 0, waiting: 0 };
+    var lv = Leave.approvedMap(s.course_id);
     var students = roster.map(function (st) {
-      var r = recs[st.std_id], status;
-      if (r) status = r.status; else status = closed ? 'absent' : 'waiting';
+      var r = recs[st.std_id], status, onLeave = false;
+      if (r) status = r.status;
+      else if (Leave.covers(lv[st.std_id], s.date, s.start_at)) { status = 'leave'; onLeave = true; }       // ไม่มีบันทึก + มีใบลาอนุมัติตรงวัน → ลา (ถ้าสแกนเข้ามา บันทึกจริงจะชนะ)
+      else status = closed ? 'absent' : 'waiting';
       counts[status]++;
-      return { stdId: st.std_id, name: st.name, status: status, at: r ? r.at : '', source: r ? r.source : '', note: r ? r.note : '', isNew: !!r && r.at === latest };
+      return { stdId: st.std_id, name: st.name, status: status, at: r ? r.at : '', source: r ? r.source : (onLeave ? 'LEAVE' : ''), note: r ? r.note : (onLeave ? 'ลา (ใบลาที่อนุมัติ)' : ''), isNew: !!r && r.at === latest };
     });
     var names = {}; roster.forEach(function (st) { names[st.std_id] = st.name; });
     var now = Date.now(), approvals = [];
@@ -477,7 +520,7 @@ var Attendance = (function () {
     return {
       course: { courseId: c.course_id, code: c.code, name: c.name, section: c.section },
       sessions: t.sessions.map(function (s) { return { sessionId: s.session_id, date: s.date, kind: s.kind }; }),
-      students: students, totalSessions: total, weightPct: type ? Number(type.pct) : null
+      students: students, totalSessions: total, weightPct: type ? Number(type.pct) : null, warnAbsent: warnAbsent_()
     };
   }
 
@@ -489,11 +532,12 @@ var Attendance = (function () {
     var all = sessionsOf_(c.course_id).sort(function (x, y) { return (x.start_at || x.opened_at) < (y.start_at || y.opened_at) ? -1 : 1; });
     var recs = {};
     Db.findRows('AttRecords', 'std_id', std).forEach(function (r) { if (r.course_id === c.course_id) recs[r.session_id] = r; });
+    var lvList = Leave.approvedMap(c.course_id)[std];
     return {
       stdId: std, name: st.name,
       sessions: all.filter(function (s) { return s.status === 'closed' || s.status === 'open' || s.status === 'paused'; }).map(function (s) {
-        var r = recs[s.session_id];
-        return { sessionId: s.session_id, date: s.date, sessionStatus: s.status, status: r ? r.status : 'absent', note: r ? r.note : '', at: r ? r.at : '' };
+        var r = recs[s.session_id], onLeave = !r && Leave.covers(lvList, s.date, s.start_at);
+        return { sessionId: s.session_id, date: s.date, sessionStatus: s.status, status: r ? r.status : (onLeave ? 'leave' : 'absent'), note: r ? r.note : (onLeave ? 'ลา (ใบลาที่อนุมัติ)' : ''), at: r ? r.at : '' };
       })
     };
   }
@@ -625,6 +669,6 @@ var Attendance = (function () {
     sessionsList: sessionsList, page: page, report: report, studentDetail: studentDetail, exportCsv: exportCsv,
     setStatus: setStatus, importRows: importRows, deleteSession: deleteSession, deleteEmpty: deleteEmpty,
     forgetDevices: forgetDevices, countForStudent: countForStudent, removeForStudents: removeForStudents,
-    syncScores: syncScores_, sweep: sweep_, phase: phase_
+    syncScores: syncScores_, sweep: sweep_, phase: phase_, statsAll: statsAll, mineStats: mineStats
   };
 })();

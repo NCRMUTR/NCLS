@@ -13,7 +13,7 @@
   function head(sub) {
     return '<div class="stack-s"><a class="brand" href="' + root + 's/home.html"><span class="mark">H</span>HBT Learning System</a><h1>งานของฉัน</h1>' + (sub || '') + '</div>';
   }
-  function foot() { return '<p class="small muted"><a href="' + root + 's/submit.html">ใส่รหัสงานเพื่อส่งงาน</a> · <a href="' + root + 's/home.html">กลับหน้าแรก</a></p>'; }
+  function foot() { return '<p class="small muted"><a href="' + root + 's/submit.html">ใส่รหัสงานเพื่อส่งงาน</a> · <a href="' + root + 's/leave.html">ส่งใบลา</a> · <a href="' + root + 's/home.html">กลับหน้าแรก</a></p>'; }
   function fmt(t) { return t ? HBT.fmtBE(t, true) : ''; }
 
   /* ---------- เลือกอาจารย์ → วิชา → ชื่อ + PIN ---------- */
@@ -91,6 +91,7 @@
       app.innerHTML = head('<p class="muted" id="who">' + esc(s.course.code) + ' กลุ่ม ' + esc(s.course.section) + ' — ' + esc(s.course.name) + '<br><b>' + esc(r.me.name) + '</b> (' + esc(r.me.stdId) + ')</p>') +
         (open.length ? '<a class="callout warn" id="todo" style="display:block" href="' + hrefOf(open[0]) + '"><b>ยังไม่ได้ส่ง ' + open.length + ' งาน</b><br>ทำเรื่องที่ใกล้กำหนดก่อน: ' + esc(open[0].title) +
           (leftTxt(open[0]) ? ' (' + esc(leftTxt(open[0])) + ')' : '') + ' — <u>กดเพื่อส่งงาน ›</u></a>' : '') +
+        '<div id="attBox"></div>' +
         '<div class="stack" id="tlist">' + (tasks.length ? tasks.map(function (t) {
           var lt = isOpen(t) ? leftTxt(t) : '';
           return '<a class="card link-card" data-code="' + esc(t.code) + '" data-open="' + (isOpen(t) ? '1' : '0') + '" href="' + hrefOf(t) + '"><div class="row sp"><h3>' + esc(t.title) + '</h3>' + pillOf(t) + '</div>' +
@@ -100,6 +101,7 @@
         '<section class="card stack-s" id="helpCard"><div class="row sp"><span class="small muted">มีเรื่องจะแจ้งอาจารย์ เช่น ติดปัญหาการส่งงาน หรือเพื่อนในกลุ่มไม่ช่วยงาน?</span><button class="btn sm" type="button" id="ibBtn">แจ้งอาจารย์</button></div></section>' +
         '<p class="small"><a href="#" id="bye">ออกจากระบบ</a></p>' + foot();
       $('#bye').addEventListener('click', function (e) { e.preventDefault(); S.clear(); pick(); });
+      S.attCard($('#attBox')).catch(function () {});
       $('#ibBtn').addEventListener('click', function () { S.inboxOpen({ me: r.me.stdId }); });
     }, function (e) {
       if (e.code === 'E_AUTH') { pick('หมดเวลาเข้าใช้งาน (2 ชั่วโมง) — เลือกวิชาและใส่ PIN อีกครั้ง'); return; }

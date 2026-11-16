@@ -102,6 +102,17 @@ var Db = (function () {
       pk: 'course_id',
       cols: [['course_id', T.TEXT, 170], ['cuts', T.TEXT, 300], ['updated_at', T.DATETIME, 160], ['updated_by', T.TEXT, 220]]
     },
+    LeaveRequests: {                  // v0.11.0 ใบลานักศึกษา · type: sick | personal · status: pending | approved | rejected | cancelled · source: STUDENT | TEACHER · ไฟล์เก็บใน Drive (HBT_Leave)
+      pk: 'leave_id',
+      cols: [
+        ['leave_id', T.TEXT, 170], ['course_id', T.TEXT, 170], ['std_id', T.TEXT, 130], ['type', T.TEXT, 80],
+        ['date_from', T.TEXT, 110], ['date_to', T.TEXT, 110], ['all_day', T.BOOL, 80], ['time_from', T.TEXT, 70], ['time_to', T.TEXT, 70],
+        ['reason', T.TEXT, 420], ['status', T.TEXT, 90], ['teacher_note', T.TEXT, 300],
+        ['form_drive_id', T.TEXT, 240], ['form_name', T.TEXT, 300], ['form_size', T.INT, 100], ['form_mime', T.TEXT, 200],
+        ['extra_drive_id', T.TEXT, 240], ['extra_name', T.TEXT, 300], ['extra_size', T.INT, 100], ['extra_mime', T.TEXT, 200],
+        ['created_at', T.DATETIME, 160], ['updated_at', T.DATETIME, 160], ['decided_by', T.TEXT, 220], ['decided_at', T.DATETIME, 160], ['source', T.TEXT, 80]
+      ]
+    },
 
     /* ---------- v0.3.0 เช็คชื่อ ---------- */
     AttSessions: {                    // 1 แถว = 1 คาบ · kind: live (สแกน) | manual (นำเข้าย้อนหลัง) · status: open | paused | closed
@@ -203,7 +214,7 @@ var Db = (function () {
   };
 
   var FORMAT = { TEXT: '@', JSON: '@', DATETIME: '@', BOOL: '@', NUM: '0.##', INT: '0' };
-  var SCHEMA_VERSION = '0.10.0';
+  var SCHEMA_VERSION = '0.11.0';
 
   var _ss = null, _checked = false, _cache = {}, _props = null, _idx = {};
   var _rec = {}, _sheets = {}, _last = {}, _xv = {};      // _rec = pk→แถว (คู่กับ _cache) · _sheets = ออบเจ็กต์ชีต · _last = แถวสุดท้าย · _xv = เวอร์ชันแคชข้าม execution (ต่อ execution)
@@ -211,7 +222,7 @@ var Db = (function () {
   /* ---------- แคชข้าม execution (CacheService) ----------
    * ตารางเล็กที่ถูกอ่านซ้ำเกือบทุกคำขอและแก้ไม่บ่อย: อ่านจากแคชแทนชีต · ทุกการเขียนเปลี่ยนเลขเวอร์ชัน (คีย์แคชใหม่) → ไม่มีข้อมูลเก่าค้าง
    * (เขียนอยู่ใน lock เสมอ และเปลี่ยนเวอร์ชันก่อนปล่อย lock · แคชพังหรือใหญ่เกิน = อ่านชีตตามปกติ) */
-  var XT = { Terms: 1, Courses: 1, Users: 1, Students: 1, CourseGroups: 1, Inbox: 1 };
+  var XT = { Terms: 1, Courses: 1, Users: 1, Students: 1, CourseGroups: 1, Inbox: 1, LeaveRequests: 1 };
   var X_TTL = 600, SMALL_ROWS = 400;
   function xver_(name) {
     if (_xv[name] === undefined) {

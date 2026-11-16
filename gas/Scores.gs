@@ -372,6 +372,7 @@ var Scores = (function () {
     Db.findRows('ScoreRecords', 'course_id', c.course_id).forEach(function (r) { recs[r.type_id + '|' + r.std_id] = r; });
     Db.findRows('ScoreAdjust', 'course_id', c.course_id).forEach(function (r) { adj[r.std_id] = r; });
     var perType = {}; types.forEach(function (t) { perType[t.type_id] = []; });
+    var lvStats = Leave.statsByStd(c.course_id);      // ข้อมูลการลา (แสดงอย่างเดียว ไม่เข้าสูตรคะแนน)
     var totals = [], grades = { A: 0, 'B+': 0, B: 0, 'C+': 0, C: 0, 'D+': 0, D: 0, F: 0 }, ungraded = 0;
     var students = Students.roster(c.course_id).map(function (s) {
       var cells = {}, base = 0, any = false;
@@ -385,7 +386,7 @@ var Scores = (function () {
       var aj = adj[s.std_id], pts = aj ? Number(aj.points) || 0 : 0, total = r2_(base + pts);
       var graded = any || pts !== 0, grade = graded ? gradeFor_(total, cuts) : '';
       if (graded) { totals.push(total); grades[grade]++; } else ungraded++;
-      return { stdId: s.std_id, name: s.name, cells: cells, base: base, adjust: aj ? { points: pts, reason: aj.reason || '' } : null, total: total, grade: grade };
+      return { stdId: s.std_id, name: s.name, cells: cells, base: base, adjust: aj ? { points: pts, reason: aj.reason || '' } : null, total: total, grade: grade, leave: lvStats[s.std_id] || null };
     });
     var tot = totalPct_(types, '');
     return {

@@ -44,6 +44,12 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
 
   function r2(n) { return Math.round(n * 100) / 100; }
   function fmtN(v) { return v === null || v === undefined ? '–' : String(r2(v)); }
+  /** ข้อมูลการลาของนักศึกษา (อนุมัติแล้ว) — แสดงอย่างเดียว ไม่เข้าสูตรคะแนน */
+  function leaveTxt(l) {
+    if (!l || (!l.sick.days && !l.personal.days)) return '<span class="muted">–</span>' + (l && l.pending ? ' <span class="pill warn" title="ใบลารออนุมัติ">รอ ' + l.pending + '</span>' : '');
+    return esc(l.sick.days + '/' + l.personal.days) + (l.pending ? ' <span class="pill warn" title="ใบลารออนุมัติ">รอ ' + l.pending + '</span>' : '');
+  }
+  function leaveTip(l) { return l ? 'ลาป่วย ' + l.sick.count + ' ครั้ง ' + l.sick.days + ' วัน · ลากิจ ' + l.personal.count + ' ครั้ง ' + l.personal.days + ' วัน (เฉพาะที่อนุมัติ) · ไม่รวมในคะแนน' : 'ไม่มีใบลา'; }
   function typeOf(tid) { return D.types.filter(function (t) { return t.typeId === tid; })[0]; }
   function stdOf(sid) { return D.students.filter(function (s) { return s.stdId === sid; })[0]; }
 
@@ -93,7 +99,7 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
     var rows = view();
     var head = '<tr><th class="sticky-c">รหัส</th><th>ชื่อ</th>' + D.types.map(function (t) {
       return '<th class="num catcol cat-' + t.cat + '" title="' + esc(t.name) + '">' + esc(t.name) + '<br><span class="xs muted">เต็ม ' + t.max + ' · ' + t.pct + '%' + (t.auto ? ' · อัตโนมัติ' : '') + '</span></th>';
-    }).join('') + '<th class="num">รวม<br><span class="xs muted">ก่อนปรับ</span></th><th class="num">ปรับ<br><span class="xs muted">+/−</span></th><th class="num">รวมสุทธิ</th><th>เกรด</th></tr>';
+    }).join('') + '<th class="num" title="ข้อมูลการลาที่อนุมัติ — แสดงอย่างเดียว ไม่รวมในคะแนน">ลา<br><span class="xs muted">ป่วย/กิจ (วัน)</span></th><th class="num">รวม<br><span class="xs muted">ก่อนปรับ</span></th><th class="num">ปรับ<br><span class="xs muted">+/−</span></th><th class="num">รวมสุทธิ</th><th>เกรด</th></tr>';
     if (!rows.length) { $('#tbl').innerHTML = '<div class="callout">ไม่พบนักศึกษาตามที่ค้นหา</div>'; return; }
     var body = rows.map(function (s) {
       return '<tr data-std="' + esc(s.stdId) + '"><td class="sticky-c mono">' + esc(s.stdId) + '</td><td>' + esc(s.name) + '</td>' + D.types.map(function (t) {
@@ -102,16 +108,16 @@ HBT.page({ active: 'courses', crumbs: [['รายวิชาของฉัน
           (c.locked ? '✎ ' : '') + (c.v === null ? '<span class="muted">–</span>' : r2(c.v)) + '</button>' +
           /* % ที่คิดได้ (ได้/เต็ม × สัดส่วน) — แสดงอย่างเดียว แก้ไม่ได้ ต้องแก้ที่คะแนน */
           '<div class="sm-pct" title="คิดจาก ' + (c.v === null ? '–' : r2(c.v)) + ' / ' + t.max + ' × ' + t.pct + '% (แก้ไม่ได้ — แก้ที่คะแนนด้านบน)">' + (c.v === null || !(t.max > 0) ? '' : '= ' + r2(c.v / t.max * t.pct) + '%') + '</div></td>';
-      }).join('') + '<td class="num">' + fmtN(s.base) + '</td>' +
+      }).join('') + '<td class="num sm-leave" title="' + esc(leaveTip(s.leave)) + '">' + leaveTxt(s.leave) + '</td><td class="num">' + fmtN(s.base) + '</td>' +
         '<td class="num"><button class="sm-cell' + (s.adjust ? ' lk' : '') + '" type="button" data-adj="1" title="' + esc(s.adjust ? (s.adjust.reason || 'คะแนนปรับ') : 'คลิกเพื่อเพิ่มคะแนนปรับ') + '" aria-label="คะแนนปรับของ ' + esc(s.name) + '">' +
         (s.adjust ? (s.adjust.points > 0 ? '+' : '') + s.adjust.points : '<span class="muted">+/−</span>') + '</button></td>' +
         '<td class="num"><b>' + (s.grade ? fmtN(s.total) : '<span class="muted">–</span>') + '</b></td><td><b class="gr">' + (s.grade ? esc(s.grade) : '<span class="muted">–</span>') + '</b></td></tr>';
     }).join('');
     function foot(label, key) {
-      return '<tr class="tfoot"><td class="sticky-c"></td><td><b>' + label + '</b></td>' + D.types.map(function (t) { return '<td class="num">' + fmtN(t.stats[key]) + '</td>'; }).join('') + '<td colspan="4"></td></tr>';
+      return '<tr class="tfoot"><td class="sticky-c"></td><td><b>' + label + '</b></td>' + D.types.map(function (t) { return '<td class="num">' + fmtN(t.stats[key]) + '</td>'; }).join('') + '<td colspan="5"></td></tr>';
     }
     $('#tbl').innerHTML = '<div class="scroll"><table id="sumTable"><thead>' + head + '</thead><tbody>' + body + '</tbody><tfoot>' +
-      foot('เฉลี่ย', 'mean') + foot('สูงสุด', 'max') + foot('ต่ำสุด', 'min') + '<tr class="tfoot"><td class="sticky-c"></td><td><b>จำนวนที่มีคะแนน</b></td>' + D.types.map(function (t) { return '<td class="num">' + t.stats.n + '</td>'; }).join('') + '<td colspan="4"></td></tr>' +
+      foot('เฉลี่ย', 'mean') + foot('สูงสุด', 'max') + foot('ต่ำสุด', 'min') + '<tr class="tfoot"><td class="sticky-c"></td><td><b>จำนวนที่มีคะแนน</b></td>' + D.types.map(function (t) { return '<td class="num">' + t.stats.n + '</td>'; }).join('') + '<td colspan="5"></td></tr>' +
       '</tfoot></table></div><p class="small muted">แสดง ' + rows.length + ' จาก ' + D.students.length + ' คน</p>';
   }
 

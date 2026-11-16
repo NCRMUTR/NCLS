@@ -694,6 +694,8 @@ var Assignments = (function () {
   return {
     list: list, get: get, save: save, setStatus: setStatus, remove: remove, submissions: submissions, fileGet: fileGet, grade: grade,
     resolve: resolve, stuTasks: stuTasks, stuTask: stuTask, stuUpload: stuUpload, stuRemoveFile: stuRemoveFile, stuSaveNote: stuSaveNote,
-    stuGroupSave: stuGroupSave, stuGroupDelete: stuGroupDelete, countForStudent: countForStudent, removeForStudents: removeForStudents, phase: phase_
+    stuGroupSave: stuGroupSave, stuGroupDelete: stuGroupDelete, countForStudent: countForStudent, removeForStudents: removeForStudents, phase: phase_,
+    /** ตัวช่วยไฟล์ที่ใช้ร่วมกับระบบใบลา (Leave.gs): ชนิดไฟล์ · ชื่อ/นามสกุล · เช็คหัวไฟล์ · เพดานจากตั้งค่า · โฟลเดอร์ Drive */
+    fileKit: { types: TYPES, cleanName: cleanFileName_, extOf: extOf_, magicOk: magicOk_, limits: limits_, driveErr: driveErr_, rootFolder: rootFolder_, trashFile: trashFile_ }
   };
 })();

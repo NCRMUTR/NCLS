@@ -57,13 +57,13 @@ var Courses = (function () {
     var termName = term ? term.name : '';
     if (a.termId && !term) throw U.E('E_NOT_FOUND');
     var all = user.role === 'admin' && U.bool(a.all);
-    var counts = studentCounts_(), inbox = Inbox.newCounts();
+    var counts = studentCounts_(), inbox = Inbox.newCounts(), leave = Leave.newCounts();
     var rows = Db.all('Courses').filter(function (r) {
       return r.term_id === termId && (all || r.owner_email === user.email);
     }).sort(function (x, y) { return (x.code + '-' + x.section) < (y.code + '-' + y.section) ? -1 : 1; });
     return {
       term: term ? { termId: termId, name: termName } : null,
-      courses: rows.map(function (r) { var o = out_(r, counts); o.inboxNew = inbox[r.course_id] || 0; return o; })
+      courses: rows.map(function (r) { var o = out_(r, counts); o.inboxNew = inbox[r.course_id] || 0; o.leaveNew = leave[r.course_id] || 0; return o; })
     };
   }
 
@@ -76,6 +76,7 @@ var Courses = (function () {
     c.pinSet = roster.filter(function (s) { return st[s.std_id] === 'set'; }).length;
     c.scoreTypes = Db.all('ScoreTypes').filter(function (t) { return t.course_id === r.course_id; }).length;
     c.inboxNew = Inbox.newCounts()[r.course_id] || 0;
+    c.leaveNew = Leave.newCounts()[r.course_id] || 0;
     return c;
   }
 

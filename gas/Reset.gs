@@ -18,7 +18,7 @@ var Reset = (function () {
 
   /** ตารางที่มี course_id — ลบทั้งหมดตอนรีเซ็ตวิชา (ลูกก่อนแม่) · ตารางใหม่ของระบบอื่น "ต้อง" มาเพิ่มที่นี่ (มีเทสต์ตรวจ) */
   var COURSE_TABLES = [
-    'AsgSubLog', 'Inbox', 'AsgFiles', 'AsgSubs', 'AsgGrades', 'AsgMembers', 'AsgGroups', 'Assignments',
+    'AsgSubLog', 'Inbox', 'LeaveRequests', 'AsgFiles', 'AsgSubs', 'AsgGrades', 'AsgMembers', 'AsgGroups', 'Assignments',
     'AttApprovals', 'AttDevices', 'AttRecords', 'AttSessions',
     'ScoreAdjust', 'GradeScale', 'ScoreRecords', 'ScoreTypes', 'PinRequests', 'CourseGroups', 'Students'
   ];
@@ -168,6 +168,14 @@ var Reset = (function () {
       var how = purgeDrive_(asgs[i].folder_id);
       res.drive[how]++;
       U.lock(function () { Db.flush(); Db.update('Assignments', asgs[i].asg_id, { folder_id: '' }); });
+    }
+
+    // 3.5) ไฟล์ใบลา (ใบรับรองแพทย์ ฯลฯ): ลบถาวรทีละไฟล์ · ล้าง id หลังลบเพื่อไม่ทำซ้ำเมื่อเรียกต่อ
+    var lvs = Leave.driveIds(id);
+    for (var j = 0; j < lvs.length; j++) {
+      if (j > 0 && Date.now() - t0 >= budget) return res;
+      lvs[j].ids.forEach(function (fid) { res.drive[purgeDrive_(fid)]++; });
+      U.lock(function () { Db.flush(); Db.update('LeaveRequests', lvs[j].leaveId, { form_drive_id: '', extra_drive_id: '' }); });
     }
 
     // 4) แถวทั้งหมดของวิชา → แถววิชาเป็นอย่างสุดท้าย

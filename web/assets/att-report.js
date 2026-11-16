@@ -21,9 +21,12 @@ HBT.page({ active: 'att', need: 'att', crumbs: [['รายวิชาของ
     var h = '<div class="page-h"><div class="stack-s"><h1>รายงานเข้าเรียน <span class="muted">' + esc(c.code) + ' กลุ่ม ' + esc(c.section) + '</span></h1>' +
       '<p>' + esc(c.name) + ' · ' + r.totalSessions + ' คาบที่ปิดแล้ว · นักศึกษา ' + r.students.length + ' คน</p></div>' +
       '<div class="row"><button class="btn" type="button" id="csvBtn">ส่งออก CSV</button><a class="btn" href="' + root + 't/att.html?id=' + q + '">ประวัติคาบ</a></div></div>';
-    h += '<div class="callout" id="wBox">คะแนนเช็คชื่อ = ปกติ 1 · สาย 0.5 · ลา 1 · ขาด 0 เฉลี่ยทุกคาบที่ปิด แล้วคิดเป็น 100 คะแนน · ' +
+    var warnN = r.students.filter(function (s) { return s.counts.absent > r.warnAbsent; }).length;
+    h += '<div class="callout" id="wBox">คะแนนเช็คชื่อ = คะแนนของแต่ละคาบ (ปกติ/สาย/ขาด ตามที่ตั้งตอนเปิดคาบ ค่าเริ่มต้น 1 / 0.5 / 0) รวมทุกคาบที่ปิด แล้วคิดเป็น 100 คะแนน · <b>ลานับเท่าขาด</b> · ' +
       (r.weightPct ? 'น้ำหนักในคะแนนรวม <b>' + r.weightPct + '%</b>' : '<b>ยังไม่ได้กำหนดน้ำหนัก</b> (ตอนนี้ 0% จึงยังไม่รวมในคะแนนรวม)') +
       ' · <a href="' + root + 't/scores.html?id=' + q + '">ตั้งน้ำหนักที่หน้าคะแนน</a></div>';
+    h += '<div class="callout' + (warnN ? ' warn' : '') + ' small" id="warnBox">' + (warnN ? '<b>ขาดเกินเกณฑ์ ' + warnN + ' คน</b> (ขาดเกิน ' + esc(r.warnAbsent) + ' ครั้ง · แสดง ⚠ ที่ชื่อ — นักศึกษาเห็นคำเตือนในหน้า “งานของฉัน”)' : 'ยังไม่มีนักศึกษาขาดเกินเกณฑ์ (' + esc(r.warnAbsent) + ' ครั้ง)') +
+      ' · “ล” ในรายงานนี้รวมคาบที่มี<a href="' + root + 't/leave.html?id=' + q + '">ใบลาที่อนุมัติ</a>และไม่มีบันทึกเช็คชื่อ (ไม่เปลี่ยนคะแนน)</div>';
     if (!r.totalSessions) {
       h += '<div class="callout" id="noRep">ยังไม่มีคาบที่ปิดแล้ว — เมื่อปิดคาบหรือนำเข้าข้อมูลย้อนหลัง รายงานจะแสดงที่นี่</div>';
       $('#box').innerHTML = h; $('#csvBtn').disabled = true; return;
@@ -32,7 +35,7 @@ HBT.page({ active: 'att', need: 'att', crumbs: [['รายวิชาของ
       r.sessions.map(function (s) { return '<th class="c" title="' + esc(HBT.fmtBE(s.date)) + '">' + esc(String(s.date).substring(5).replace('-', '/')) + (s.kind === 'manual' ? '*' : '') + '</th>'; }).join('') +
       '<th class="num">ปกติ</th><th class="num">สาย</th><th class="num">ลา</th><th class="num">ขาด</th><th class="num">%</th></tr></thead><tbody>' +
       r.students.map(function (s) {
-        return '<tr data-std="' + esc(s.stdId) + '"><td class="mono sticky-c">' + esc(s.stdId) + '</td><td><a href="#" data-det="' + esc(s.stdId) + '">' + esc(s.name) + '</a></td>' +
+        return '<tr data-std="' + esc(s.stdId) + '"><td class="mono sticky-c">' + esc(s.stdId) + '</td><td><a href="#" data-det="' + esc(s.stdId) + '">' + esc(s.name) + '</a>' + (s.counts.absent > r.warnAbsent ? ' <span class="pill bad" title="ขาดเกินเกณฑ์ ' + esc(r.warnAbsent) + ' ครั้ง">⚠ ขาด ' + s.counts.absent + '</span>' : '') + '</td>' +
           s.records.map(function (x) { var m = SH[x]; return '<td class="c"><span class="pill ' + m[1] + '" title="' + m[2] + '">' + m[0] + '</span></td>'; }).join('') +
           '<td class="num">' + s.counts.normal + '</td><td class="num">' + s.counts.late + '</td><td class="num">' + s.counts.leave + '</td><td class="num">' + s.counts.absent + '</td>' +
           '<td class="num"><b>' + (s.percent === null ? '' : s.percent) + '</b></td></tr>';

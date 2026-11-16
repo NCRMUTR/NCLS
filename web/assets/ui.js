@@ -88,6 +88,16 @@
     return withTime && m[4] ? s + ' ' + m[4] + ':' + m[5] : s;
   };
 
+  /** บันทึกไฟล์จากข้อมูล base64 ที่ server ส่งมา f = { name, mime, b64 } (ดาวน์โหลดลงเครื่อง) */
+  HBT.saveB64 = function (f) {
+    var bin = atob(f.b64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([arr], { type: f.mime || 'application/octet-stream' }));
+    var a = document.createElement('a'); a.href = url; a.download = f.name || 'file'; a.style.display = 'none';
+    document.body.appendChild(a); a.click(); if (a.parentNode) a.parentNode.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+  };
+
   HBT.SYSTEM_NAMES = { att: 'เช็คชื่อ', exam: 'สอบออนไลน์', asg: 'ส่งงาน' };
   HBT.SYSTEM_DESC = {
     att: 'QR + GPS คาบเรียน รายงานเข้าเรียน',

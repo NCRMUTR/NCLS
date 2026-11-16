@@ -6,6 +6,7 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
   ctx.content.insertAdjacentHTML('beforeend',
     '<div class="page-h"><div class="stack-s"><h1>ตั้งค่าระบบ</h1><p class="muted">เวอร์ชันระบบ ' + esc(ctx.me.version) + '</p></div></div>' +
     '<section class="card stack" id="termCard"><h3>ภาคเรียน</h3><div id="termBody"><div class="loading"><span class="spin"></span></div></div></section>' +
+    '<section class="card stack" id="leaveFormCard"><h3>แบบฟอร์มใบลา</h3><div id="lfBody"><div class="loading"><span class="spin"></span></div></div></section>' +
     '<form id="setForm" class="stack" novalidate><div id="setBody" class="stack"><div class="loading"><span class="spin"></span> กำลังโหลด…</div></div>' +
     '<div class="err" id="setErr" role="alert"></div>' +
     '<div class="row"><button class="btn primary" type="submit" id="setSave" disabled>บันทึกการตั้งค่า</button><span class="help" id="setHint"></span></div></form>');
@@ -84,6 +85,10 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
             ' style="accent-color:var(--accent)"> ' + esc(o) + '</label>';
         }).join('') + '</div></div>';
     }
+    if (d.type === 'text') {
+      return '<div class="field"><label for="' + id + '">' + esc(d.label) + '</label><textarea id="' + id + '" data-key="' + esc(d.key) + '" rows="7" maxlength="' + d.max + '">' + esc(d.value) + '</textarea>' +
+        '<span class="help">ไม่เกิน ' + d.max + ' ตัวอักษร · ขึ้นบรรทัดใหม่ได้ · ว่างไว้ = ไม่แสดงคำชี้แจง</span></div>';
+    }
     return '';
   }
   function renderSettings() {
@@ -104,6 +109,7 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
     HBT.$$('#setBody input[data-key]').forEach(function (i) {
       cur[i.getAttribute('data-key')] = i.type === 'checkbox' ? (i.checked ? '1' : '0') : i.value.trim();
     });
+    HBT.$$('#setBody textarea[data-key]').forEach(function (t) { cur[t.getAttribute('data-key')] = t.value.replace(/\r\n?/g, '\n').trim(); });
     HBT.$$('#setBody [data-list]').forEach(function (w) {
       cur[w.getAttribute('data-key')] = HBT.$$('input:checked', w).map(function (c) { return c.value; }).join(',');
     });
@@ -139,6 +145,8 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
       } else if (d.type === 'num') {
         var x = Number(v);
         if (v === '' || !isFinite(x) || x < d.min || x > d.max) { $('#setErr').textContent = '“' + d.label + '” ต้องเป็นตัวเลขระหว่าง ' + d.min + ' ถึง ' + d.max; return; }
+      } else if (d.type === 'text' && v.length > d.max) {
+        $('#setErr').textContent = '“' + d.label + '” ยาวเกิน ' + d.max + ' ตัวอักษร'; return;
       } else if (d.type === 'list' && !v) {
         $('#setErr').textContent = '“' + d.label + '” ต้องเลือกอย่างน้อย 1 รายการ'; return;
       }
@@ -151,6 +159,47 @@ HBT.page({ active: 'settings', need: 'admin', crumbs: [['ผู้ดูแล',
       var d = e.detail && e.detail.key && label[e.detail.key];
       $('#setErr').textContent = d ? '“' + d.label + '” ไม่ถูกต้อง' + (e.detail.min != null ? ' (ต้องอยู่ระหว่าง ' + e.detail.min + '–' + e.detail.max + ')' : '') : HBT.errMsg(e);
     });
+  });
+
+  /* ---------- แบบฟอร์มใบลา (อัปโหลดแยกจากปุ่มบันทึกการตั้งค่า: ทำทันที) ---------- */
+  var lf = null;
+  function mb(n) { n = Number(n) || 0; return n >= 1048576 ? (Math.round(n / 104857.6) / 10) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+  function renderLeaveForm() {
+    var has = lf.hasForm, acc = lf.types.map(function (t) { return '.' + t; }).join(',') + (lf.types.indexOf('jpg') >= 0 ? ',.jpeg' : '');
+    $('#lfBody').innerHTML =
+      (has ? '<div class="row sp"><div class="stack-s"><b id="lfName">' + esc(lf.formName) + '</b><span class="small muted">' + esc(mb(lf.formSize)) + (lf.formAt ? ' · อัปโหลดเมื่อ ' + esc(HBT.fmtBE(lf.formAt, true)) : '') + '</span></div>' +
+        '<div class="row"><button class="btn sm" type="button" id="lfDl">ดาวน์โหลด</button><button class="btn sm danger" type="button" id="lfDel">ลบแบบฟอร์ม</button></div></div>'
+        : '<div class="callout warn small" id="lfNone"><b>ยังไม่ได้อัปโหลดแบบฟอร์ม</b> — นักศึกษาจะยังไม่มีปุ่มดาวน์โหลดแบบฟอร์มการลาในหน้าส่งใบลา</div>') +
+      '<div class="field"><label for="lfFile">' + (has ? 'แทนที่ด้วยไฟล์ใหม่' : 'เลือกไฟล์แบบฟอร์ม') + '</label><input id="lfFile" type="file" accept="' + esc(acc) + '">' +
+      '<span class="help">ชนิดไฟล์ที่รับ: ' + esc(lf.types.join(', ')) + ' · ไม่เกิน ' + esc(lf.maxMb) + ' MB (ตามตั้งค่า “ไฟล์งานนักศึกษา”) · คำชี้แจงการลาตั้งได้ที่หมวด “ใบลา” ด้านล่าง</span></div>' +
+      '<div class="err" id="lfErr" role="alert"></div><div class="row"><button class="btn primary" type="button" id="lfUp">' + (has ? 'แทนที่แบบฟอร์ม' : 'อัปโหลดแบบฟอร์ม') + '</button></div>';
+    $('#lfUp').addEventListener('click', function () {
+      var f = $('#lfFile').files[0]; $('#lfErr').textContent = '';
+      if (!f) { $('#lfErr').textContent = 'กรุณาเลือกไฟล์ก่อน'; return; }
+      if (f.size > lf.maxMb * 1048576) { $('#lfErr').textContent = 'ไฟล์ใหญ่เกิน ' + lf.maxMb + ' MB'; return; }
+      HBT.busy(this, function () {
+        return new Promise(function (res, rej) {
+          var r = new FileReader();
+          r.onload = function () { var s = String(r.result || ''), i = s.indexOf(','); res(i >= 0 ? s.substring(i + 1) : ''); };
+          r.onerror = function () { rej(new Error('อ่านไฟล์ไม่ได้')); };
+          r.readAsDataURL(f);
+        }).then(function (b64) { return HBT.api.call('leave.formSet', { name: f.name, b64: b64 }, { write: true }); })
+          .then(function (r) { lf = r; renderLeaveForm(); HBT.toast('อัปโหลดแบบฟอร์มแล้ว', 'good'); });
+      }).catch(function (e) { $('#lfErr').textContent = HBT.errMsg(e); });
+    });
+    if (has) {
+      $('#lfDl').addEventListener('click', function () {
+        HBT.busy(this, function () { return HBT.api.call('pub.leaveForm', {}).then(HBT.saveB64); }).catch(function (e) { HBT.toast(HBT.errMsg(e), 'bad'); });
+      });
+      $('#lfDel').addEventListener('click', function () {
+        if (!window.confirm('ลบแบบฟอร์มใบลาที่อัปโหลดไว้? (นักศึกษาจะดาวน์โหลดไม่ได้จนกว่าจะอัปโหลดใหม่)')) return;
+        HBT.busy(this, function () { return HBT.api.call('leave.formDelete', {}, { write: true }).then(function (r) { lf = r; renderLeaveForm(); HBT.toast('ลบแบบฟอร์มแล้ว', 'good'); }); })
+          .catch(function (e) { HBT.toast(HBT.errMsg(e), 'bad'); });
+      });
+    }
+  }
+  HBT.api.call('pub.leaveInfo', {}).then(function (r) { lf = r; renderLeaveForm(); }, function (e) {
+    $('#lfBody').innerHTML = '<div class="callout bad">' + esc(HBT.errMsg(e)) + '</div>';
   });
 
   /* ---------- โหลด ---------- */

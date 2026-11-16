@@ -453,7 +453,8 @@ test('settings.get ครบค่า default', () => {
   assert.strictEqual(m.file_types, 'pdf,jpg,png,docx,xlsx,pptx');
   assert.strictEqual(m.att_require_pin, '1');
   assert.strictEqual(m.att_score_normal, '1'); assert.strictEqual(m.att_score_late, '0.5'); assert.strictEqual(m.att_score_absent, '0');
-  assert.strictEqual(r.length, 12);
+  assert.strictEqual(r.length, 16);
+  assert.strictEqual(m.att_warn_absent, '2'); assert.strictEqual(m.leave_past_days, '14'); assert.strictEqual(m.leave_future_days, '30'); assert.strictEqual(m.leave_notice, '');
 });
 test('settings.set: บันทึกหลายค่า + มีผลทันทีข้าม execution + audit', () => {
   const s = fresh();

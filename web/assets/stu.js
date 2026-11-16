@@ -191,5 +191,30 @@
     HBT.modal.open('mInbox');
   }
 
-  HBT.stu = { inboxOpen: inboxOpen, sess: sess, call: call, login: login, clear: clear, loginBox: loginBox, fmtSize: fmtSize, readB64: readB64, shrinkImage: shrinkImage, opt: opt };
+  var AT_TH = { normal: ['ปกติ', 'good'], late: ['สาย', 'warn'], leave: ['ลา', 'info'], absent: ['ขาด', 'bad'] };
+  /** การ์ดสรุปการเข้าเรียนของฉันในวิชานี้ (stu.attMine) + คำเตือนเมื่อขาดเกินเกณฑ์ · เติมลงใน el · ไม่ทำให้หน้าพังถ้าโหลดไม่ได้ */
+  function attCard(el) {
+    if (!el) return Promise.resolve();
+    el.innerHTML = '<p class="small muted"><span class="spin"></span> กำลังโหลดการเข้าเรียน…</p>';
+    return call('stu.attMine', {}).then(function (r) {
+      var root = HBT.api.root(), h = '';
+      if (r.over) {
+        h += '<div class="callout bad" id="absWarn"><b>คำเตือน: ขาดเรียนแล้ว ' + esc(r.absent) + ' ครั้ง</b> (เกินเกณฑ์ ' + esc(r.warnAbsent) + ' ครั้ง) — ควรปรึกษาอาจารย์ผู้สอน · ถ้ามีเหตุจำเป็นที่ขาด ส่งใบลาได้ที่ <a href="' + root + 's/leave.html">ส่งใบลา</a></div>';
+      } else if (r.absent > 0 && r.absent === r.warnAbsent) {
+        h += '<div class="callout warn" id="absNear"><b>ขาดเรียนแล้ว ' + esc(r.absent) + ' ครั้ง</b> — ถ้าขาดอีก 1 ครั้งจะเกินเกณฑ์ (' + esc(r.warnAbsent) + ' ครั้ง)</div>';
+      }
+      if (!r.totalSessions) {
+        h += '<section class="card stack-s" id="attCard"><b>การเข้าเรียน</b><p class="small muted">ยังไม่มีคาบที่เช็คชื่อเสร็จแล้วในวิชานี้</p></section>';
+      } else {
+        h += '<section class="card stack-s" id="attCard"><div class="row sp"><b>การเข้าเรียนของฉันในวิชานี้</b><span class="pill info" id="attPct">' + (r.percent === null ? '–' : esc(r.percent) + '%') + '</span></div>' +
+          '<p class="small">เช็คชื่อแล้ว <b>' + esc(r.totalSessions) + '</b> คาบ · ปกติ <b>' + esc(r.normal) + '</b> · สาย <b>' + esc(r.late) + '</b> · ลา <b>' + esc(r.leave) + '</b> · ขาด <b>' + esc(r.absent) + '</b></p>' +
+          '<details><summary class="small">ดูรายคาบ</summary><div class="row" style="margin-top:8px;gap:6px">' + r.history.map(function (x) {
+            var t = AT_TH[x.status] || ['?', '']; return '<span class="pill ' + t[1] + '" title="' + esc(HBT.fmtBE(x.date)) + '">' + esc(HBT.fmtBE(x.date)) + ' · ' + t[0] + '</span>';
+          }).join('') + '</div></details></section>';
+      }
+      el.innerHTML = h;
+    }, function (e) { if (e && e.code === 'E_AUTH') throw e; el.innerHTML = ''; });
+  }
+
+  HBT.stu = { attCard: attCard, inboxOpen: inboxOpen, sess: sess, call: call, login: login, clear: clear, loginBox: loginBox, fmtSize: fmtSize, readB64: readB64, shrinkImage: shrinkImage, opt: opt };
 })();

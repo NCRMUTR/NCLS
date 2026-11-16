@@ -253,6 +253,23 @@ var ROUTES = {
   'inbox.delete':    { auth: 'user', write: true, fn: function (a, u) { return Inbox.remove(u, a); } },
   'stu.groupSave':   { auth: 'student', lock: true, fn: function (a, s) { return Assignments.stuGroupSave(s, a); } },
   'stu.groupDelete': { auth: 'student', lock: true, fn: function (a, s) { return Assignments.stuGroupDelete(s, a); } },
+  /* ---------- ใบลานักศึกษา (v0.11) ---------- */
+  'pub.leaveInfo':    { auth: 'none', fn: function () { return Leave.info(); } },
+  'pub.leaveForm':    { auth: 'none', fn: function () { return Leave.formGet(); } },
+  'stu.leaveSubmit':  { auth: 'student', big: true, fn: function (a, s) { return Leave.submit(s, a); } },
+  'stu.leaveAttach':  { auth: 'student', big: true, fn: function (a, s) { return Leave.attach(s, a); } },
+  'stu.leaveMine':    { auth: 'student', fn: function (a, s) { return Leave.mine(s); } },
+  'stu.leaveCancel':  { auth: 'student', lock: true, fn: function (a, s) { return Leave.cancel(s, a); } },
+  'stu.attMine':      { auth: 'student', fn: function (a, s) { return Attendance.mineStats(s); } },
+  'leave.list':       { auth: { system: 'att' }, fn: function (a, u) { return Leave.list(u, a); } },
+  'leave.summary':    { auth: { system: 'att' }, fn: function (a, u) { return Leave.summary(u, a); } },
+  'leave.exportCsv':  { auth: { system: 'att' }, fn: function (a, u) { return Leave.exportCsv(u, a); } },
+  'leave.fileGet':    { auth: { system: 'att' }, fn: function (a, u) { return Leave.fileGet(u, a); } },
+  'leave.decide':     { auth: { system: 'att' }, write: true, fn: function (a, u) { return Leave.decide(u, a); } },
+  'leave.create':     { auth: { system: 'att' }, write: true, fn: function (a, u) { return Leave.create(u, a); } },
+  'leave.delete':     { auth: { system: 'att' }, write: true, fn: function (a, u) { return Leave.remove(u, a); } },
+  'leave.formSet':    { auth: 'admin', big: true, write: true, fn: function (a, u) { return Leave.formSet(u, a); } },
+  'leave.formDelete': { auth: 'admin', write: true, fn: function (a, u) { return Leave.formDelete(u); } },
   /* ---------- สำรอง (เจ้าของวิชา/admin) · รีเซ็ต (admin) ---------- */
   'backup.manifest': { auth: 'user', fn: function (a, u) { return Reset.manifest(u, a); } },
   'backup.mark':     { auth: 'user', write: true, fn: function (a, u) { return Reset.mark(u, a); } },
@@ -297,7 +314,10 @@ function handle_(body) {
     if (typeof body !== 'string' || !body) throw U.E('E_BAD_REQUEST');
     // body ใหญ่ (> MAX_BODY) รับเฉพาะ route ที่ประกาศ big:true — ตรวจเบื้องต้นจากชื่อ action ที่หัว body ก่อน parse แล้วตรวจซ้ำหลัง parse
     var bigBody = body.length > APP.MAX_BODY;
-    if (bigBody && (body.length > APP.MAX_BODY_BIG || body.substring(0, 300).indexOf('"stu.upload"') < 0)) throw U.E('E_BAD_REQUEST', { why: 'too_large' });
+    if (bigBody) {
+      var head = /"action"s*:s*"([A-Za-z0-9_.]+)"/.exec(body.substring(0, 300)), hn = head ? head[1] : '';
+      if (body.length > APP.MAX_BODY_BIG || !hn || !Object.prototype.hasOwnProperty.call(ROUTES, hn) || ROUTES[hn].big !== true) throw U.E('E_BAD_REQUEST', { why: 'too_large' });
+    }
     var req;
     try { req = JSON.parse(body); } catch (e) { throw U.E('E_BAD_REQUEST', { why: 'json' }); }
     if (!req || typeof req !== 'object' || Array.isArray(req)) throw U.E('E_BAD_REQUEST');
